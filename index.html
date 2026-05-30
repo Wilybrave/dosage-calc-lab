@@ -127,19 +127,27 @@
   .pill-tabs{display:flex; gap:8px; margin-bottom:18px}
   .pill-tabs button{background:var(--panel); border:1px solid var(--line); color:var(--muted); padding:8px 18px; border-radius:99px; cursor:pointer; font-size:14px}
   .pill-tabs button.on{background:var(--indigo); color:#0a1024; font-weight:700; border-color:var(--indigo)}
+
+  /* mobile top bar + drawer scaffolding (hidden on desktop) */
+  .topbar{display:none}
+  .overlay{display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:45}
+  .hamburger{background:transparent; border:1px solid var(--line); color:var(--ink); font-size:20px;
+    width:44px; height:44px; border-radius:10px; cursor:pointer; line-height:1; flex:0 0 auto}
+
   @media (max-width:780px){
     .app{flex-direction:column}
-    /* sidebar becomes a sticky horizontal scroller so the lesson isn't buried */
-    .side{width:100%; height:auto; position:sticky; top:0; z-index:20; flex:none;
-      padding:10px 12px 8px; border-right:none; border-bottom:1px solid var(--line);
-      background:rgba(22,33,58,.96); backdrop-filter:blur(8px)}
-    .brand{padding:2px 4px 6px} .brand h1{font-size:15px}
-    .progress-wrap{padding:2px 4px 8px}
-    nav{display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px}
-    nav button{flex:0 0 auto; width:auto; white-space:nowrap; padding:8px 12px; margin:0}
-    nav button .ck{margin-left:2px}
-    .side .reset{margin-top:8px; padding:6px}
-    main{padding:20px 16px 60px}
+    /* top bar shows the hamburger + title; everything else lives in the drawer */
+    .topbar{display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:40;
+      background:rgba(22,33,58,.97); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+      padding:9px 14px}
+    .tb-title{font-weight:700; font-size:16px}
+    /* sidebar becomes an off-canvas drawer */
+    .side{position:fixed; top:0; left:0; height:100vh; width:84%; max-width:300px; flex:none;
+      transform:translateX(-100%); transition:transform .25s ease; z-index:50; overflow-y:auto;
+      border-right:1px solid var(--line); box-shadow:0 0 50px rgba(0,0,0,.5)}
+    .side.open{transform:translateX(0)}
+    .overlay.show{display:block}
+    main{padding:20px 16px 64px}
     h2.title{font-size:23px}
     .card,.qbox{padding:18px 16px}
     /* keep wide equations inside their box instead of stretching the page */
@@ -149,6 +157,11 @@
 </style>
 </head>
 <body>
+<header class="topbar">
+  <button class="hamburger" id="hambtn" aria-label="Open menu">☰</button>
+  <span class="tb-title">💊 Dosage Calc Lab</span>
+</header>
+<div class="overlay" id="overlay"></div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -760,7 +773,12 @@ function renderNav(){
   $('#progtext').textContent=`${done} of ${total} modules done`;
 }
 
-function go(id){ current=id; activeTab='learn'; renderNav(); renderMain(); window.scrollTo(0,0); }
+function setDrawer(open){
+  const side=$('.side'), ov=$('#overlay');
+  if(side) side.classList.toggle('open',open);
+  if(ov) ov.classList.toggle('show',open);
+}
+function go(id){ current=id; activeTab='learn'; renderNav(); renderMain(); setDrawer(false); window.scrollTo(0,0); }
 function openTab(t){ activeTab=t; renderMain(); }
 
 function renderMain(){
@@ -1038,6 +1056,10 @@ $('#resetBtn').onclick=()=>{
     state={}; save(); go('welcome');
   }
 };
+
+/* mobile drawer toggle */
+$('#hambtn').onclick=()=>{ const side=$('.side'); setDrawer(!side.classList.contains('open')); };
+$('#overlay').onclick=()=>setDrawer(false);
 
 /* boot */
 renderNav(); renderMain();
