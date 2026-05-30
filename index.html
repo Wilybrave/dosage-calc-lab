@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dosage Calc — Learn from Scratch</title>
+<style>
+  :root{
+    --bg:#0f1724; --panel:#16213a; --panel2:#1d2b48; --card:#1b2742;
+    --ink:#e8eefc; --muted:#9fb0d0; --line:#2a3a5e;
+    --teal:#34d3b5; --teal-d:#1d9c84; --indigo:#7c8cff; --amber:#ffcb6b;
+    --good:#39d98a; --good-bg:#13351f; --bad:#ff7a85; --bad-bg:#3a1620;
+    --chip:#23365f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 700px at 80% -10%,#1b2c50 0%,#0f1724 55%);
+    color:var(--ink); line-height:1.6; min-height:100vh;
+  }
+  a{color:var(--teal)}
+  .app{display:flex; min-height:100vh}
+
+  /* Sidebar */
+  .side{
+    width:280px; flex:0 0 280px; background:var(--panel);
+    border-right:1px solid var(--line); padding:18px 14px; position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .brand{display:flex; align-items:center; gap:10px; padding:6px 8px 14px}
+  .brand .logo{font-size:26px}
+  .brand h1{font-size:16px; margin:0; line-height:1.2}
+  .brand small{color:var(--muted); font-weight:500}
+  .progress-wrap{padding:6px 8px 14px}
+  .bar{height:8px; background:#0c1322; border-radius:99px; overflow:hidden}
+  .bar > i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--teal),var(--indigo)); transition:width .4s}
+  .progress-wrap span{font-size:12px; color:var(--muted)}
+  nav button{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    background:transparent; border:none; color:var(--ink); padding:10px 12px; border-radius:10px;
+    cursor:pointer; font-size:14.5px; margin-bottom:2px;
+  }
+  nav button:hover{background:var(--panel2)}
+  nav button.active{background:linear-gradient(90deg,rgba(52,211,181,.18),rgba(124,140,255,.12)); box-shadow:inset 0 0 0 1px var(--line)}
+  nav button .ic{width:26px; text-align:center; font-size:17px}
+  nav button .nm{flex:1}
+  nav button .ck{font-size:13px; color:var(--good)}
+  .side .reset{margin-top:14px; font-size:12px; color:var(--muted); background:none; border:1px dashed var(--line); width:100%; padding:8px; border-radius:8px; cursor:pointer}
+  .side .reset:hover{color:var(--bad)}
+
+  /* Main */
+  main{flex:1; padding:34px 40px 80px; max-width:920px}
+  h2.title{font-size:28px; margin:0 0 4px}
+  .sub{color:var(--muted); margin:0 0 24px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 24px; margin-bottom:20px; box-shadow:0 8px 30px rgba(0,0,0,.18)}
+  .card h3{margin:0 0 10px; font-size:19px}
+  .card h4{margin:18px 0 8px; font-size:15px; color:var(--teal)}
+  p.lead{font-size:16px}
+  ul.tidy{padding-left:18px} ul.tidy li{margin:5px 0}
+  .callout{border-left:3px solid var(--amber); background:rgba(255,203,107,.08); padding:12px 16px; border-radius:0 10px 10px 0; margin:16px 0}
+  .callout.tip{border-color:var(--teal); background:rgba(52,211,181,.08)}
+  .callout.warn{border-color:var(--bad); background:rgba(255,122,133,.08)}
+  .callout b{color:var(--ink)}
+  code.k{background:#0c1322; padding:2px 7px; border-radius:6px; font-size:13.5px; color:var(--amber)}
+
+  /* conversion table */
+  table.conv{width:100%; border-collapse:collapse; margin:8px 0}
+  table.conv td{padding:8px 10px; border-bottom:1px solid var(--line); font-size:14.5px}
+  table.conv td:first-child{color:var(--teal); font-weight:600; white-space:nowrap}
+
+  /* unit chips */
+  .chip{display:inline-block; background:var(--chip); border-radius:6px; padding:0 6px; font-size:.92em; color:#bcd0ff}
+
+  /* DA fraction chain */
+  .da{display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:14px 0; font-size:18px}
+  .da .eq{color:var(--muted); font-weight:700}
+  .da .op{color:var(--muted); font-size:22px; font-weight:700}
+  .frac{display:inline-flex; flex-direction:column; align-items:center; text-align:center; min-width:64px}
+  .frac .top,.frac .bot{padding:4px 12px; white-space:nowrap}
+  .frac .top{border-bottom:2px solid var(--ink)}
+  .frac.single .top{border-bottom:none}
+  .unit{color:#bcd0ff}
+  .num{color:var(--ink); font-weight:600}
+  .struck{position:relative; opacity:.5}
+  .struck::after{content:""; position:absolute; left:-2px; right:-2px; top:50%; height:2px; background:var(--bad); transform:rotate(-12deg)}
+  .result-line{font-size:16px; margin-top:6px; color:var(--muted)}
+  .result-line b{color:var(--teal); font-size:18px}
+
+  /* practice */
+  .qbox{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 24px}
+  .qmeta{display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:13px; margin-bottom:10px}
+  .qprompt{font-size:17px; margin:6px 0 16px}
+  .qprompt .ord{color:var(--amber); font-weight:600}
+  .answer-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .answer-row input{
+    font-size:20px; padding:10px 14px; width:150px; border-radius:10px; border:1px solid var(--line);
+    background:#0c1322; color:var(--ink); text-align:right;
+  }
+  .answer-row .unit-tag{font-size:18px; color:var(--muted)}
+  button.btn{background:linear-gradient(90deg,var(--teal-d),var(--teal)); color:#06241d; font-weight:700; border:none; padding:11px 20px; border-radius:10px; cursor:pointer; font-size:15px}
+  button.btn:hover{filter:brightness(1.07)}
+  button.ghost{background:transparent; border:1px solid var(--line); color:var(--ink)}
+  button.ghost:hover{background:var(--panel2)}
+  .feedback{margin-top:16px; padding:14px 16px; border-radius:12px; display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:var(--good-bg); border:1px solid #1f6e44}
+  .feedback.no{background:var(--bad-bg); border:1px solid #7a2733}
+  .feedback h5{margin:0 0 6px; font-size:15px}
+  .feedback.ok h5{color:var(--good)} .feedback.no h5{color:var(--bad)}
+  .solution{margin-top:10px; background:#0c1322; border-radius:10px; padding:6px 16px}
+  .scorepill{background:var(--chip); padding:4px 10px; border-radius:99px; font-size:13px}
+
+  .mcq{display:flex; flex-direction:column; gap:10px; margin:10px 0}
+  .mcq button{text-align:left; background:#0c1322; border:1px solid var(--line); color:var(--ink); padding:12px 14px; border-radius:10px; cursor:pointer; font-size:15px}
+  .mcq button:hover{border-color:var(--teal)}
+  .mcq button.correct{background:var(--good-bg); border-color:#1f6e44}
+  .mcq button.wrong{background:var(--bad-bg); border-color:#7a2733}
+
+  .start-row{display:flex; gap:12px; flex-wrap:wrap; margin-top:8px}
+  .seg{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0}
+  .seg button{background:#0c1322; border:1px solid var(--line); color:var(--ink); padding:8px 14px; border-radius:99px; cursor:pointer; font-size:13.5px}
+  .seg button.on{background:var(--teal); color:#06241d; font-weight:700; border-color:var(--teal)}
+  .hidden{display:none}
+  .steps{counter-reset:s; padding-left:0; list-style:none}
+  .steps li{position:relative; padding:6px 0 6px 38px; margin:2px 0}
+  .steps li::before{counter-increment:s; content:counter(s); position:absolute; left:0; top:6px; width:24px; height:24px; background:var(--teal); color:#06241d; border-radius:50%; text-align:center; font-weight:700; font-size:13px; line-height:24px}
+  .pill-tabs{display:flex; gap:8px; margin-bottom:18px}
+  .pill-tabs button{background:var(--panel); border:1px solid var(--line); color:var(--muted); padding:8px 18px; border-radius:99px; cursor:pointer; font-size:14px}
+  .pill-tabs button.on{background:var(--indigo); color:#0a1024; font-weight:700; border-color:var(--indigo)}
+  @media (max-width:780px){
+    .app{flex-direction:column}
+    /* sidebar becomes a sticky horizontal scroller so the lesson isn't buried */
+    .side{width:100%; height:auto; position:sticky; top:0; z-index:20; flex:none;
+      padding:10px 12px 8px; border-right:none; border-bottom:1px solid var(--line);
+      background:rgba(22,33,58,.96); backdrop-filter:blur(8px)}
+    .brand{padding:2px 4px 6px} .brand h1{font-size:15px}
+    .progress-wrap{padding:2px 4px 8px}
+    nav{display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px}
+    nav button{flex:0 0 auto; width:auto; white-space:nowrap; padding:8px 12px; margin:0}
+    nav button .ck{margin-left:2px}
+    .side .reset{margin-top:8px; padding:6px}
+    main{padding:20px 16px 60px}
+    h2.title{font-size:23px}
+    .card,.qbox{padding:18px 16px}
+    /* keep wide equations inside their box instead of stretching the page */
+    .da{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px}
+    .answer-row input{width:130px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">💊</div>
+      <div><h1>Dosage Calc Lab</h1><small>from scratch · go slow</small></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="bar"><i id="progbar"></i></div>
+      <span id="progtext">0 of 0 modules done</span>
+    </div>
+    <nav id="nav"></nav>
+    <button class="reset" id="resetBtn">↺ Reset all my progress</button>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ============================================================
+   CORE ENGINE — Dimensional Analysis chains
+   A "chain" is an array of factors: {tv,tu,bv,bu}
+   meaning (tv tu) / (bv bu). Multiply tops, multiply bots, divide.
+   The numeric answer is ALWAYS computed from the chain, so the
+   worked solution and the answer can never disagree.
+============================================================ */
+const $=(s,el=document)=>el.querySelector(s);
+const rand=a=>a[Math.floor(Math.random()*a.length)];
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+
+function rawValue(chain){
+  let top=1, bot=1;
+  for(const f of chain){ top*=f.tv; bot*=f.bv; }
+  return top/bot;
+}
+function roundDose(v, mode){
+  let d = mode==='whole'?0 : mode==='tenth'?1 : mode==='hundredth'?2
+        : (Math.abs(v)<1?2:1); // 'auto' = nursing default
+  const p=10**d;
+  return Math.round((v+Number.EPSILON)*p)/p;
+}
+function finalAnswer(p){
+  let v=rawValue(p.chain);
+  if(p.divide) v=v/p.divide;
+  return roundDose(v,p.round);
+}
+// strike units that appear in both a top and a bottom somewhere in the chain
+function cancelSet(chain){
+  const tops=new Set(), bots=new Set();
+  chain.forEach(f=>{ if(f.tu) tops.add(f.tu); if(f.bu) bots.add(f.bu); });
+  const c=new Set();
+  tops.forEach(u=>{ if(bots.has(u)) c.add(u); });
+  return c;
+}
+function fmtNum(n){ return (Math.round(n*1000)/1000).toString(); }
+
+function renderChain(p){ return renderChainOpts(p,{cancel:true,result:true}); }
+function renderChainOpts(p,opts){
+  const cancel = opts.cancel ? cancelSet(p.chain) : new Set();
+  let html=`<div class="da"><span class="eq">X ${p.target} =</span>`;
+  p.chain.forEach((f,i)=>{
+    if(i>0) html+=`<span class="op">×</span>`;
+    const single = (f.bv===1 && !f.bu);
+    const tu = f.tu? `<span class="unit ${cancel.has(f.tu)?'struck':''}"> ${f.tu}</span>`:'';
+    const bu = f.bu? `<span class="unit ${cancel.has(f.bu)?'struck':''}"> ${f.bu}</span>`:'';
+    html+=`<div class="frac ${single?'single':''}">
+        <div class="top"><span class="num">${fmtNum(f.tv)}</span>${tu}</div>
+        ${single?'':`<div class="bot"><span class="num">${fmtNum(f.bv)}</span>${bu}</div>`}
+      </div>`;
+  });
+  html+=`</div>`;
+  if(!opts.result) return html;
+  const tops=p.chain.map(f=>f.tv).filter(v=>v!==1);
+  const bots=p.chain.map(f=>f.bv).filter(v=>v!==1);
+  const raw=rawValue(p.chain);
+  let line=`<div class="result-line">= ${tops.join(' × ')||'1'} ÷ ${bots.join(' × ')||'1'} = ${fmtNum(raw)}`;
+  if(p.divide){ line+=` &nbsp;→ split into ${p.divide} doses → ${fmtNum(raw/p.divide)}`; }
+  line+=` &nbsp;<b>= ${finalAnswer(p)} ${p.target}</b></div>`;
+  return html+line;
+}
+
+/* ---- Walkthrough reasoning engine (derives steps from the chain) ---- */
+const KNOWN_CONV=[['g','mg','1 g = 1,000 mg'],['mg','mcg','1 mg = 1,000 mcg'],['kg','lb','1 kg = 2.2 lb'],
+  ['L','mL','1 L = 1,000 mL'],['oz','mL','1 oz = 30 mL'],['tsp','mL','1 tsp = 5 mL'],
+  ['tbsp','mL','1 tbsp = 15 mL'],['min','hr','1 hr = 60 min']];
+function convStatement(u1,u2){ for(const[a,b,s] of KNOWN_CONV){ if((a===u1&&b===u2)||(a===u2&&b===u1)) return s; } return null; }
+function roundWord(r){ return r==='whole'?'the nearest whole number':r==='tenth'?'the nearest tenth':r==='hundredth'?'the nearest hundredth':'the standard rule (tenth if over 1, hundredth if under 1)'; }
+function isRate(p){ return /\//.test(p.target); }
+function buildWalkthrough(p){
+  const f0=p.chain[0];
+  const hasConv=p.chain.some((f,i)=>i>0 && convStatement(f.tu,f.bu));
+  // 1 — orient
+  const s1=`<p>The question asks for an answer in <b>${p.target}</b>. In dimensional analysis you write your destination first:</p>
+    <div class="da"><span class="eq">X ${p.target} =</span> <span class="muted" style="color:var(--muted)">…(everything else has to cancel down to this)</span></div>`;
+  // 2 — key info
+  let bullets=[];
+  if(f0.bu) bullets.push(`<b>What's running:</b> ${fmtNum(f0.tv)} ${f0.tu} over ${fmtNum(f0.bv)} ${f0.bu}.`);
+  else bullets.push(`<b>Ordered / starting amount:</b> ${fmtNum(f0.tv)} ${f0.tu}.`);
+  p.chain.forEach((f,i)=>{ if(i===0) return;
+    const cs=convStatement(f.tu,f.bu);
+    if(cs) bullets.push(`<b>A conversion you'll need:</b> ${cs}.`);
+    else if(f.tu==='gtt'||f.bu==='gtt') bullets.push(`<b>Drop factor:</b> ${fmtNum(f.tv)} ${f.tu} per ${fmtNum(f.bv)} ${f.bu}.`);
+    else bullets.push(`<b>What's on hand:</b> ${fmtNum(f.bv)} ${f.bu} in every ${fmtNum(f.tv)} ${f.tu}.`);
+  });
+  if(p.divide) bullets.push(`<b>Heads up:</b> it's a daily dose split into ${p.divide} equal doses — they want <u>per dose</u>.`);
+  const s2=`<p>Strip the question down to numbers that matter (ignore drug names and route words like PO/IM/IV — they don't change the math):</p>
+    <ul class="tidy">${bullets.map(b=>`<li>${b}</li>`).join('')}</ul>`;
+  // 3 — method
+  let s3;
+  if(p.target==='mL/hr') s3=`<p>This is an <b>IV pump rate</b>. Use volume over time: <code class="k">mL ÷ hr</code>. If the time is in minutes, bridge with <code class="k">60 min = 1 hr</code>. Dimensional analysis does both in one line.</p>`;
+  else if(p.target==='gtt/min') s3=`<p>This is a <b>manual drip rate</b>. Use <code class="k">(volume × drop factor) ÷ time in minutes</code>. Watch the clock — the answer is per <u>minute</u>, so hours must become minutes first.</p>`;
+  else if(hasConv) s3=`<p>The units don't match, so a conversion is required. <b>Dimensional analysis is the cleanest pick</b> — it folds the conversion right into the chain. (Desired-over-Have would force you to convert in a separate step first.)</p>`;
+  else s3=`<p>The units already match, so any method works. We'll use <b>dimensional analysis</b> to stay consistent — but <code class="k">(D ÷ H) × Q</code> would give the same number.</p>`;
+  // 4 set up, 5 cancel, 6 compute
+  const s4=`<p>Lay the ordered amount down first, then add each fraction so the unit you want gone sits on the opposite level:</p>${renderChainOpts(p,{cancel:false,result:false})}`;
+  const s5=`<p>Now cross out every unit that shows up on a top <i>and</i> a bottom. The only survivor should be <b>${p.target}</b> — if it isn't, a fraction is upside down.</p>${renderChainOpts(p,{cancel:true,result:false})}`;
+  const s6=`<p>Multiply across the tops, multiply across the bottoms, divide${p.divide?`, then split into ${p.divide} doses`:''}:</p>${renderChainOpts(p,{cancel:true,result:true})}`;
+  // 7 round
+  const fa=finalAnswer(p);
+  const lead = fa<1 ? `Because it's less than 1, keep the <b>leading zero</b> (write ${fa}, never ${String(fa).replace(/^0/,'')}). ` : '';
+  const s7=`<p>Round to <b>${roundWord(p.round)}</b>. ${lead}Never leave a trailing zero.</p>
+    <div class="callout tip" style="font-size:18px"><b>Final answer: ${fa} ${p.target}</b></div>`;
+  return [
+    {title:'1 · Read it — what are they asking?', html:s1},
+    {title:'2 · Pull out the important info', html:s2},
+    {title:'3 · Choose your approach', html:s3},
+    {title:'4 · Set up the equation', html:s4},
+    {title:'5 · Cancel the units', html:s5},
+    {title:'6 · Multiply &amp; divide', html:s6},
+    {title:'7 · Round &amp; format (ATI)', html:s7},
+  ];
+}
+
+/* ============================================================
+   PRACTICE GENERATORS  (each returns a problem object)
+============================================================ */
+function genConvert(){
+  const opts=[
+    ()=>{const v=rand([2,3,4,5,1.5,0.5]);return{prompt:`Convert <span class="ord">${v} g</span> to milligrams (mg).`,chain:[{tv:v,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'}],target:'mg',round:'whole'};},
+    ()=>{const v=rand([2,5,0.5,0.25,1.5]);return{prompt:`Convert <span class="ord">${v} mg</span> to micrograms (mcg).`,chain:[{tv:v,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'}],target:'mcg',round:'whole'};},
+    ()=>{const kg=rand([10,20,40,50,70,90]);return{prompt:`A client weighs <span class="ord">${kg*2.2} lb</span>. Convert to kilograms (kg).`,chain:[{tv:kg*2.2,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'}],target:'kg',round:'tenth'};},
+    ()=>{const oz=rand([1,2,3,4]);return{prompt:`Convert <span class="ord">${oz} oz</span> to milliliters (mL).`,chain:[{tv:oz,tu:'oz',bv:1,bu:''},{tv:30,tu:'mL',bv:1,bu:'oz'}],target:'mL',round:'whole'};},
+    ()=>{const t=rand([1,2,3]);return{prompt:`Convert <span class="ord">${t} tsp</span> to milliliters (mL).`,chain:[{tv:t,tu:'tsp',bv:1,bu:''},{tv:5,tu:'mL',bv:1,bu:'tsp'}],target:'mL',round:'whole'};},
+  ];
+  return rand(opts)();
+}
+function genSolid(withConv=false){
+  const drug=rand(['levothyroxine','prednisone','metoprolol','furosemide','digoxin','warfarin']);
+  const H=rand([25,50,75,100,125,250,500]);
+  const tabs=rand([0.5,1,2,3]);
+  let D=H*tabs;
+  if(withConv && Math.random()<0.6){
+    // order in g (available mg) OR order in mg (available mcg)
+    if(H<=125 && Math.random()<0.5){ // available mcg
+      return {prompt:`Order: <span class="ord">${drug} ${D/1000} mg</span> PO. Available: ${drug} <b>${H} mcg</b> tablets. How many tablets per dose? (Round to nearest whole number.)`,
+        chain:[{tv:D/1000,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'tab',bv:H,bu:'mcg'}],target:'tablets',round:'whole'};
+    } else { // available mg, order g
+      return {prompt:`Order: <span class="ord">${drug} ${D/1000} g</span> PO. Available: ${drug} <b>${H} mg</b> tablets. How many tablets per dose? (Round to nearest whole number.)`,
+        chain:[{tv:D/1000,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'tab',bv:H,bu:'g'}],target:'tablets',round:'whole'};
+    }
+  }
+  return {prompt:`Order: <span class="ord">${drug} ${D} mg</span> PO. Available: ${drug} <b>${H} mg</b> tablets. How many tablets per dose? (Round to nearest whole number.)`,
+    chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:1,tu:'tab',bv:H,bu:'mg'}],target:'tablets',round:'whole'};
+}
+function genLiquid(){
+  const drug=rand(['amoxicillin','acetaminophen','naproxen','cephalexin','ibuprofen']);
+  const Q=rand([5,5,5,1]); const H=rand([125,250,100,50,160]);
+  const D=H*rand([1,2,3,4])/rand([1,2]); // realistic order
+  return {prompt:`Order: <span class="ord">${drug} ${D} mg</span> PO. Available: ${drug} oral suspension <b>${H} mg/${Q} mL</b>. How many mL per dose? (Round to nearest tenth.)`,
+    chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:Q,tu:'mL',bv:H,bu:'mg'}],target:'mL',round:'tenth'};
+}
+function genInject(){
+  const t=rand(['mg','units']);
+  if(t==='mg'){
+    const drug=rand(['morphine','diphenhydramine','metoprolol','furosemide','ondansetron']);
+    const H=rand([1,2,4,5,10,25,50]); const D=H*rand([0.5,1,2,3])/rand([1,2]);
+    return {prompt:`Order: <span class="ord">${drug} ${+D.toFixed(1)} mg</span> IV. Available: ${drug} <b>${H} mg/mL</b>. How many mL? (Round to nearest tenth.)`,
+      chain:[{tv:+D.toFixed(1),tu:'mg',bv:1,bu:''},{tv:1,tu:'mL',bv:H,bu:'mg'}],target:'mL',round:'tenth'};
+  } else {
+    const H=rand([1000,5000,10000,100000]); const D=rand([500,1000,2000,2500,3000,300000,600000]).valueOf();
+    const Dd=H>=100000? rand([300000,600000,900000]) : rand([500,1000,2000,2500]);
+    return {prompt:`Order: <span class="ord">${Dd.toLocaleString()} units</span> SubQ. Available: <b>${H.toLocaleString()} units/mL</b>. How many mL? (Round to nearest tenth.)`,
+      chain:[{tv:Dd,tu:'units',bv:1,bu:''},{tv:1,tu:'mL',bv:H,bu:'units'}],target:'mL',round:'tenth'};
+  }
+}
+function genWeight(){
+  const drug=rand(['vancomycin','enoxaparin','gentamicin','acyclovir','clindamycin']);
+  const R=rand([1,2,5,10,15,20,45]);
+  const kg=rand([10,20,30,40,50,60,70,80,90,100]); const lb=kg*2.2;
+  const divided=Math.random()<0.5;
+  if(divided){
+    const every=rand([8,12]); const doses=24/every;
+    return {prompt:`Order: <span class="ord">${drug} ${R} mg/kg/day</span> divided every ${every} hr. Client weighs <b>${lb} lb</b>. How many mg per <u>dose</u>? (Round to nearest whole number.)`,
+      chain:[{tv:lb,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:R,tu:'mg',bv:1,bu:'kg'}],target:'mg',round:'whole',divide:doses,
+      hint:`This is mg per <i>day</i> first, then split into ${doses} equal doses.`};
+  }
+  return {prompt:`Order: <span class="ord">${drug} ${R} mg/kg/dose</span>. Client weighs <b>${lb} lb</b>. How many mg per dose? (Round to nearest tenth.)`,
+    chain:[{tv:lb,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:R,tu:'mg',bv:1,bu:'kg'}],target:'mg',round:'tenth'};
+}
+function genPump(){
+  const drug=rand(['cefazolin','ampicillin','vancomycin','D5W','normal saline']);
+  if(Math.random()<0.5){
+    const V=rand([250,500,1000]); const T=rand([2,4,6,8,10,12,24]);
+    return {prompt:`Infuse <span class="ord">${V} mL</span> of ${drug} over <b>${T} hr</b>. Set the pump to how many mL/hr? (Round to nearest whole number.)`,
+      chain:[{tv:V,tu:'mL',bv:T,bu:'hr'}],target:'mL/hr',round:'whole'};
+  }
+  const V=rand([50,100,150]); const Tmin=rand([20,30,45,60,90]);
+  return {prompt:`Infuse <span class="ord">${V} mL</span> of ${drug} over <b>${Tmin} min</b>. Set the pump to how many mL/hr? (Round to nearest whole number.)`,
+    chain:[{tv:V,tu:'mL',bv:Tmin,bu:'min'},{tv:60,tu:'min',bv:1,bu:'hr'}],target:'mL/hr',round:'whole'};
+}
+function genGtt(){
+  const V=rand([50,100,150,250,500,1000]); const DF=rand([10,15,20,60]);
+  let Tmin, label;
+  if(Math.random()<0.5){ Tmin=rand([20,30,45,60,90,120]); label=`${Tmin} min`; }
+  else { const hr=rand([2,3,4,6,8]); Tmin=hr*60; label=`${hr} hr`; }
+  return {prompt:`Infuse <span class="ord">${V} mL</span> over <b>${label}</b>. Drop factor is <b>${DF} gtt/mL</b>. How many gtt/min? (Round to nearest whole number.)`,
+    chain: Tmin===Number(label.split(' ')[0])
+      ? [{tv:V,tu:'mL',bv:Tmin,bu:'min'},{tv:DF,tu:'gtt',bv:1,bu:'mL'}]
+      : [{tv:V,tu:'mL',bv:Tmin,bu:'min'},{tv:DF,tu:'gtt',bv:1,bu:'mL'}],
+    target:'gtt/min',round:'whole'};
+}
+
+// Same-unit problems used to teach all three methods side-by-side
+function genThreeMethods(){
+  if(Math.random()<0.6){
+    const drug=rand(['amoxicillin','cephalexin','acetaminophen','ferrous sulfate','digoxin']);
+    const Q=rand([5,5,1]); const H=rand([125,250,100,80,50]);
+    const factor=rand([1,2,3,4]); const D=H*factor;
+    return {prompt:`Order: <span class="ord">${drug} ${D} mg</span>. Available: <b>${H} mg/${Q} mL</b>. How many mL? (Round to nearest tenth.)`,
+      D,H,Q,massU:'mg',formU:'mL',showMethods:true,target:'mL',round:'tenth',
+      chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:Q,tu:'mL',bv:H,bu:'mg'}]};
+  }
+  const drug=rand(['prednisone','metoprolol','lisinopril','furosemide']);
+  const H=rand([5,10,20,25,50]); const tabs=rand([0.5,1,2]); const D=H*tabs;
+  return {prompt:`Order: <span class="ord">${drug} ${D} mg</span>. Available: <b>${H} mg</b> scored tablets. How many tablets? (Round to nearest tenth.)`,
+    D,H,Q:1,massU:'mg',formU:'tab',showMethods:true,target:'tablets',round:'tenth',
+    chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:1,tu:'tab',bv:H,bu:'mg'}]};
+}
+function fracHTML(tn,tu,bn,bu){
+  return `<div class="frac"><div class="top"><span class="num">${tn}</span> <span class="unit">${tu}</span></div>`+
+         `<div class="bot"><span class="num">${bn}</span> <span class="unit">${bu}</span></div></div>`;
+}
+function renderThreeMethods(p){
+  const {D,H,Q,massU,formU}=p, ans=finalAnswer(p);
+  const m1=`<h4>Method 1 · Ratio &amp; Proportion</h4>
+    <p>Write the strength you <b>have</b> as a ratio, set it equal to the <b>desired</b> dose with the unknown X, then cross-multiply.</p>
+    <div class="da">${fracHTML(H,massU,Q,formU)}<span class="op">=</span>${fracHTML(D,massU,'X',formU)}</div>
+    <div class="result-line">Cross-multiply: ${H} · X = ${D} · ${Q} &nbsp;→&nbsp; X = (${D} × ${Q}) ÷ ${H} <b>= ${ans} ${p.target}</b></div>`;
+  const m2=`<h4>Method 2 · Desired Over Have (D ÷ H × Q)</h4>
+    <p><code class="k">D</code> = desired (${D} ${massU}) · <code class="k">H</code> = have (${H} ${massU}) · <code class="k">Q</code> = quantity (${Q} ${formU}).</p>
+    <div class="result-line">(D ÷ H) × Q = (${D} ÷ ${H}) × ${Q} = ${fmtNum(D/H)} × ${Q} <b>= ${ans} ${p.target}</b></div>`;
+  const m3=`<h4>Method 3 · Dimensional Analysis</h4>${renderChain(p)}`;
+  return m1+m2+m3;
+}
+
+/* ============================================================
+   SAFETY / FORMATTING quiz (multiple choice)
+============================================================ */
+const safetyMCQ=[
+  {q:"Which is written correctly and safely?", a:["0.5 mg","5.0 mg",".5 mg"], correct:0, why:"Use a leading zero (0.5) and never a trailing zero (5.0 → could be misread as 50)."},
+  {q:"A tablet calculation gives you 8 tablets for one dose. What should you do?", a:["Re-calculate and verify with another nurse","Give all 8 as calculated","Look it up on the internet"], correct:0, why:"An unusually high count is a red flag — stop, recheck, and verify with another nurse."},
+  {q:"Why convert pounds to kilograms before weight-based dosing?", a:["kg is the standardized unit drug doses are based on","Pounds are more precise","It doesn't matter"], correct:0, why:"Weight-based orders are written in mg/kg. You must work in kg."},
+  {q:"Your DA setup ends with mg left over, but the question asks for mL. What does that tell you?", a:["A factor is flipped — re-track your units","Convert mg to mL at the end","Just write mL anyway"], correct:0, why:"If the leftover unit isn't your target, a fraction is upside down. Flip it and re-track."},
+  {q:"How should 0.50 mL be written on a chart?", a:["0.5 mL","0.50 mL",".50 mL"], correct:0, why:"Drop the trailing zero (0.5) and keep the leading zero."},
+  {q:"A liquid answer comes out to 1.27 mL in a regular syringe. Round it to:", a:["1.3 mL","1 mL","1.27 mL"], correct:0, why:"Values greater than 1 round to the nearest tenth (regular syringe)."},
+];
+
+/* ============================================================
+   CONTENT — modules
+============================================================ */
+const CONV_TABLE=`
+<table class="conv">
+<tr><td>1 kg</td><td>= 1,000 g = 2.2 lb</td></tr>
+<tr><td>1 g</td><td>= 1,000 mg</td></tr>
+<tr><td>1 mg</td><td>= 1,000 mcg</td></tr>
+<tr><td>1 L</td><td>= 1,000 mL</td></tr>
+<tr><td>1 mL</td><td>= 1 cc</td></tr>
+<tr><td>1 oz (fluid)</td><td>= 30 mL</td></tr>
+<tr><td>1 tsp</td><td>= 5 mL</td></tr>
+<tr><td>1 tbsp</td><td>= 15 mL = 3 tsp</td></tr>
+<tr><td>1 cup / glass</td><td>= 8 oz = 240 mL</td></tr>
+</table>`;
+
+const modules=[
+  {
+    id:'welcome', icon:'👋', name:'Start Here', noPractice:true,
+    title:'Welcome — let’s do this slowly',
+    lesson:()=>`
+      <div class="card">
+        <p class="lead">You told me two things: you're learning dosage calc <b>from scratch</b>, and you <b>like dimensional analysis</b>. This whole lab is built around that.</p>
+        <h4>How this works</h4>
+        <ul class="tidy">
+          <li><b>Each module</b> has a short <i>Learn</i> tab (plain English, no rushing) and a <i>Practice</i> tab with unlimited fresh questions.</li>
+          <li>Practice questions are <b>auto-graded</b> and every one shows the full step-by-step solution — so you learn even when you miss.</li>
+          <li>Get <b>5 correct</b> in a module and it earns a ✓. Your progress saves automatically in this browser.</li>
+          <li>The last module, <b>Exam Bank</b>, has your real competency questions.</li>
+        </ul>
+        <div class="callout tip"><b>The big idea you'll lean on the whole time:</b> in dimensional analysis you don't decide whether to multiply or divide. You just line up fractions so the units you don't want <i>cancel out</i>, and the right number falls out the end. If your units are right, your math is right.</div>
+        <h4>Suggested path</h4>
+        <ol class="steps">
+          <li>Units & Conversions — your foundation.</li>
+          <li>The 3 Methods — Ratio &amp; Proportion, D/H × Q, and Dimensional Analysis side by side.</li>
+          <li>The DA Method up close — the technique you'll lean on most.</li>
+          <li>Solid → Liquid → Injectable → Weight → IV Pump → Drip Rate — one situation at a time.</li>
+          <li>ATI Rounding & Safety — the rules that keep patients safe.</li>
+          <li>Exam Bank — your real questions, fully solved.</li>
+          <li><b>Guided Walkthrough</b> — practice the thinking, step by step.</li>
+          <li><b>Real Test</b> — no hints, scored, just like exam day.</li>
+        </ol>
+        <div class="start-row"><button class="btn" onclick="go('units')">Start with conversions →</button></div>
+      </div>`
+  },
+  {
+    id:'units', icon:'📏', name:'Units & Conversions', gen:genConvert, target:'right answers',
+    title:'Module 1 · Units & Conversions',
+    lesson:()=>`
+      <div class="card">
+        <h3>Why this comes first</h3>
+        <p>Almost every dosage problem mixes units — an order in <code class="k">mg</code>, a bottle labeled in <code class="k">mcg</code>, a weight in <code class="k">lb</code>. Before you can calculate, everything has to speak the same language. These conversions are the words.</p>
+        <div class="callout tip"><b>You don't memorize these by staring.</b> You memorize them by using them. That's what Practice is for. For now, just know they exist and where to look.</div>
+        <h4>The conversions you need</h4>
+        ${CONV_TABLE}
+        <h4>The one mental trick</h4>
+        <p>Each row above is really <b>two fractions equal to 1</b>. Take <code class="k">1 g = 1000 mg</code>:</p>
+        ${renderChain({target:'(just showing fractions)',round:'auto',chain:[{tv:1,tu:'g',bv:1000,bu:'mg'}]}).split('<div class="result-line">')[0]}
+        <p>…is the same fact as <span class="chip">1000 mg / 1 g</span>. Because both equal 1, you're allowed to multiply by either one without changing the value — you only change the <i>units</i>. You'll pick whichever direction cancels the unit you want gone.</p>
+        <div class="callout"><b>Going DOWN the ladder (bigger → smaller unit), the number gets bigger.</b> 1 g is 1000 mg. 1 mg is 1000 mcg. Going up, smaller. If your answer drifts the wrong way, you flipped a fraction.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice conversions →</button></div>
+      </div>`
+  },
+  {
+    id:'methods', icon:'🧮', name:'The 3 Methods', gen:genThreeMethods, target:'right answers',
+    title:'Module 2 · The Three Methods',
+    lesson:()=>`
+      <div class="card">
+        <h3>Three roads, same destination</h3>
+        <p>Your textbook lists three accepted methods. They are <b>not</b> three different answers — they're three ways to arrange the exact same numbers. Your exam can show any of them, so you want to recognize all three. Then lean on whichever clicks for your brain.</p>
+        <p><b>The example:</b> Order amoxicillin <span class="chip">400 mg</span>. Available <span class="chip">250 mg / 5 mL</span>.</p>
+        ${renderThreeMethods({D:400,H:250,Q:5,massU:'mg',formU:'mL',target:'mL',round:'tenth',chain:[{tv:400,tu:'mg',bv:1,bu:''},{tv:5,tu:'mL',bv:250,bu:'mg'}]})}
+        <div class="callout tip"><b>All three landed on 8 mL.</b> Ratio &amp; Proportion suits "this is to that as…" thinking. D/H × Q is the fastest formula when units already match. <b>Dimensional analysis wins the moment a conversion is involved</b> (mg→mcg, lb→kg) — the units police your setup for you, which is exactly why it's your favorite and the one we drill hardest.</div>
+        <div class="callout warn"><b>One rule for D/H × Q and Ratio &amp; Proportion:</b> Desired and Have must be in the <b>same unit</b> first. If the order is mg and the bottle is mcg, convert before you plug in — or just use DA, which folds the conversion right into the chain.</div>
+        <p>Practice below shows every answer solved all three ways, so you can compare and find your favorite.</p>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice all three →</button></div>
+      </div>`
+  },
+  {
+    id:'da', icon:'🧭', name:'The DA Method', gen:()=>genSolid(false), target:'right answers',
+    title:'Module 3 · Dimensional Analysis, step by step',
+    lesson:()=>`
+      <div class="card">
+        <h3>The whole method in four moves</h3>
+        <p>Dimensional analysis (DA) is just lining up fractions so units cancel diagonally, leaving the unit you want. Here are the four steps — then we'll do one together.</p>
+        <ol class="steps">
+          <li><b>Write your target unit.</b> What is the answer measured in? Tablets? mL? mL/hr? Write <code class="k">X tablets =</code> on the left. That's your destination.</li>
+          <li><b>Start with what's ordered.</b> Put the ordered dose as a fraction over 1.</li>
+          <li><b>Add factors that cancel.</b> Each new fraction puts the unit you want to <i>delete</i> on the opposite level (top vs bottom) so it cancels diagonally.</li>
+          <li><b>Multiply across, divide.</b> Multiply all tops, multiply all bottoms, divide. Whatever unit survived should be your target.</li>
+        </ol>
+        <h4>Let's do one together</h4>
+        <p><b>Order:</b> Synthroid <span class="chip">0.15 mg</span> by mouth. <b>Available:</b> <span class="chip">75 mcg</span> tablets. How many tablets?</p>
+        <p><b>Step 1 — target:</b> the answer is in tablets. So: <code class="k">X tabs =</code></p>
+        <p><b>Step 2 — what's ordered:</b> 0.15 mg, over 1.</p>
+        <p><b>Step 3 — cancel mg, get to mcg, then to tablets.</b> mg and mcg don't match, so we bridge them with <code class="k">1 mg = 1000 mcg</code>, then use the tablet strength. Watch the red strike-throughs — those are units cancelling:</p>
+        ${renderChain({target:'tabs',round:'whole',chain:[{tv:0.15,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'tab',bv:75,bu:'mcg'}]})}
+        <div class="callout tip"><b>Read the cancels:</b> <span class="chip">mg</span> on top cancels <span class="chip">mg</span> on bottom. <span class="chip">mcg</span> on top cancels <span class="chip">mcg</span> on bottom. The only unit with nothing to cancel it is <b>tab</b> — which is exactly what we wanted. That's the signal you set it up right.</div>
+        <div class="callout warn"><b>If the leftover unit is wrong</b> (say you ended with mcg, not tabs), one fraction is upside-down. Flip it and re-track. Don't push numbers around — fix the units.</div>
+        <p>Now you try. This first practice set is simple one-step tablet problems so you can feel the rhythm.</p>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice the method →</button></div>
+      </div>`
+  },
+  {
+    id:'solid', icon:'💊', name:'Solid (tabs/caps)', gen:()=>genSolid(true), target:'right answers',
+    title:'Module 4 · Tablets & Capsules',
+    lesson:()=>`
+      <div class="card">
+        <h3>Solid dosage</h3>
+        <p>Tablets and capsules ask: <i>how many do I hand the patient?</i> Two flavors:</p>
+        <ul class="tidy">
+          <li><b>Same units</b> — order and bottle both in mg. One fraction does it.</li>
+          <li><b>Different units</b> — order in g or mg, bottle in mg or mcg. Add a conversion fraction in the middle (Module 1).</li>
+        </ul>
+        <h4>Worked example (with a conversion)</h4>
+        <p><b>Order:</b> 0.175 mg levothyroxine. <b>Available:</b> 88 mcg tablets.</p>
+        ${renderChain({target:'tablets',round:'whole',chain:[{tv:0.175,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'tab',bv:88,bu:'mcg'}]})}
+        <div class="callout"><b>Rounding tablets:</b> round to a <b>whole number</b> — unless the tablet is <i>scored</i> (made to be split), where a 0.5 is allowed. You can't give a patient 1.99 of an unscored tablet, so that becomes 2.</div>
+        <div class="callout warn"><b>Sanity check:</b> if the math says 7 or 8 tablets for one dose, stop. Recheck and verify with another nurse — real doses are almost never that many pills.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice tablets →</button></div>
+      </div>`
+  },
+  {
+    id:'liquid', icon:'🧴', name:'Liquid (oral)', gen:genLiquid, target:'right answers',
+    title:'Module 5 · Oral Liquids',
+    lesson:()=>`
+      <div class="card">
+        <h3>Liquid dosage</h3>
+        <p>Liquids are labeled as <b>strength per volume</b> — like <code class="k">250 mg / 5 mL</code>. The question is how many mL to draw up. The "/5 mL" part is just another fraction in your chain.</p>
+        <h4>Worked example</h4>
+        <p><b>Order:</b> amoxicillin 400 mg. <b>Available:</b> 250 mg / 5 mL.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:400,tu:'mg',bv:1,bu:''},{tv:5,tu:'mL',bv:250,bu:'mg'}]})}
+        <p>mg cancels mg; mL is the survivor. </p>
+        <div class="callout tip"><b>Always put the unit you want (mL) on top</b> of the strength fraction, and the unit you're deleting (mg) on the bottom. That guarantees mL survives.</div>
+        <div class="callout"><b>Rounding liquids:</b> nearest <b>tenth</b> (0.1 mL) for a regular syringe. Leading zero, no trailing zero — <code class="k">0.6 mL</code>, never <code class="k">.6</code> or <code class="k">0.60</code>.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice liquids →</button></div>
+      </div>`
+  },
+  {
+    id:'inject', icon:'💉', name:'Injectable', gen:genInject, target:'right answers',
+    title:'Module 6 · Injectables',
+    lesson:()=>`
+      <div class="card">
+        <h3>Injectable dosage</h3>
+        <p>Mechanically <b>identical to liquids</b> — strength per mL — but the strength may be in <code class="k">mg/mL</code> or <code class="k">units/mL</code> (heparin, insulin, penicillin). The setup never changes.</p>
+        <h4>Worked example — units</h4>
+        <p><b>Order:</b> heparin 2,000 units IV. <b>Available:</b> 5,000 units/mL.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:2000,tu:'units',bv:1,bu:''},{tv:1,tu:'mL',bv:5000,bu:'units'}]})}
+        <div class="callout warn"><b>High-alert drugs.</b> Heparin and insulin are exactly the meds where a missing leading zero or a stray trailing zero causes a 10× error. <code class="k">0.4 mL</code> — never <code class="k">.4</code>, never <code class="k">0.40</code>. This is where the formatting rules literally save lives.</div>
+        <div class="callout"><b>Rounding:</b> nearest tenth for a standard syringe; a 1 mL tuberculin syringe lets you round to the hundredth (0.01 mL).</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice injectables →</button></div>
+      </div>`
+  },
+  {
+    id:'weight', icon:'⚖️', name:'By Weight', gen:genWeight, target:'right answers',
+    title:'Module 7 · Weight-Based Dosing',
+    lesson:()=>`
+      <div class="card">
+        <h3>Dosing by body weight</h3>
+        <p>Pediatric and many adult drugs are ordered as <code class="k">mg per kg</code>. Two things trip people up: the weight arrives in <b>pounds</b>, and the order is often <b>per day, divided</b> into several doses.</p>
+        <h4>The recipe</h4>
+        <ol class="steps">
+          <li>Convert lb → kg: <code class="k">kg = lb ÷ 2.2</code>.</li>
+          <li>Multiply: <code class="k">mg/kg × kg = mg per day</code>.</li>
+          <li>If it's "divided every X hr," split the daily total. Every 12 hr = 2 doses; every 8 hr = 3; every 6 hr = 4.</li>
+        </ol>
+        <h4>Worked example (divided dose)</h4>
+        <p><b>Order:</b> vancomycin 45 mg/kg/day divided every 12 hr. <b>Weight:</b> 198 lb.</p>
+        ${renderChain({target:'mg',round:'whole',divide:2,chain:[{tv:198,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:45,tu:'mg',bv:1,bu:'kg'}]})}
+        <div class="callout tip"><b>The chain gives you the daily total</b> (lb → kg → mg/day). Then the "÷ 2 doses" is one last simple step. Read it carefully: the question wants <i>per dose</i>, not per day.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice weight-based →</button></div>
+      </div>`
+  },
+  {
+    id:'pump', icon:'🩺', name:'IV Pump (mL/hr)', gen:genPump, target:'right answers',
+    title:'Module 8 · IV Pump Rates (mL/hr)',
+    lesson:()=>`
+      <div class="card">
+        <h3>Setting an electronic pump</h3>
+        <p>A pump wants a rate in <b>mL/hr</b>. The plain formula is <code class="k">mL/hr = total volume ÷ time in hours</code>. In DA terms, it's volume over time, with a min→hr conversion if the order is in minutes.</p>
+        <h4>Worked example — minutes</h4>
+        <p><b>Order:</b> 50 mL of ampicillin over 30 min.</p>
+        ${renderChain({target:'mL/hr',round:'whole',chain:[{tv:50,tu:'mL',bv:30,bu:'min'},{tv:60,tu:'min',bv:1,bu:'hr'}]})}
+        <p>The <span class="chip">min</span> cancels, leaving mL on top and hr on bottom = <b>mL/hr</b>, exactly the pump's unit.</p>
+        <div class="callout"><b>Rounding pump rates:</b> nearest whole number — pumps don't take fractional mL/hr.</div>
+        <div class="callout tip"><b>Quick gut check:</b> 50 mL in half an hour ≈ 100 mL in an hour. The math (100 mL/hr) should match your instinct.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice pump rates →</button></div>
+      </div>`
+  },
+  {
+    id:'gtt', icon:'💧', name:'Drip Rate (gtt/min)', gen:genGtt, target:'right answers',
+    title:'Module 9 · Manual Drip Rates (gtt/min)',
+    lesson:()=>`
+      <div class="card">
+        <h3>Counting drops by hand</h3>
+        <p>With manual (gravity) tubing there's no pump — you count <b>drops per minute</b>. The tubing has a <b>drop factor</b> (gtt/mL) printed on the package. Formula:</p>
+        <p style="text-align:center"><code class="k">gtt/min = (volume mL × drop factor) ÷ time in minutes</code></p>
+        <h4>Worked example</h4>
+        <p><b>Order:</b> 100 mL over 20 min. <b>Drop factor:</b> 15 gtt/mL.</p>
+        ${renderChain({target:'gtt/min',round:'whole',chain:[{tv:100,tu:'mL',bv:20,bu:'min'},{tv:15,tu:'gtt',bv:1,bu:'mL'}]})}
+        <p>mL cancels mL; gtt survives over min = <b>gtt/min</b>.</p>
+        <div class="callout warn"><b>Watch the time unit.</b> The answer is per <i>minute</i>, so time must be in minutes. If the order says hours, convert first (× 60). A drip set over "8 hr" is 480 min.</div>
+        <div class="callout"><b>Rounding drops:</b> whole number — you can't count half a drop.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice drip rates →</button></div>
+      </div>`
+  },
+  {
+    id:'safety', icon:'🛡️', name:'ATI Rounding & Safety', mcq:safetyMCQ, target:'right answers',
+    title:'Module 10 · ATI Rounding & Safety Rules',
+    lesson:()=>`
+      <div class="card">
+        <h3>The rules that keep patients safe</h3>
+        <div class="callout warn"><b>1 · No trailing zeros.</b> Write <code class="k">5 mg</code>, never <code class="k">5.0 mg</code>. A faint decimal point turns 5.0 into 50 — a 10× overdose.</div>
+        <div class="callout warn"><b>2 · Always a leading zero.</b> Write <code class="k">0.6 mL</code>, never <code class="k">.6 mL</code>. A missed decimal turns .6 into 6 — again 10×.</div>
+        <div class="callout tip"><b>3 · Verify the leftover unit.</b> If your cancelling doesn't leave exactly the target unit, a fraction is flipped. Fix the setup, not the number.</div>
+        <h4>ATI rounding rules</h4>
+        <table class="conv">
+          <tr><td>Tablets / capsules / drops</td><td>whole number (0.5 only if scored)</td></tr>
+          <tr><td>Liquids — regular syringe</td><td>nearest tenth (0.1 mL)</td></tr>
+          <tr><td>Liquids — tuberculin (1 mL) syringe</td><td>nearest hundredth (0.01 mL)</td></tr>
+          <tr><td>Answer less than 1</td><td>nearest hundredth</td></tr>
+          <tr><td>Answer greater than 1</td><td>nearest tenth</td></tr>
+          <tr><td>Pump rate / drip rate</td><td>whole number</td></tr>
+        </table>
+        <div class="callout"><b>The unusually-high-number rule:</b> if a dose comes out to a weird, large quantity, don't administer it. Re-calculate and verify with another nurse.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Take the safety quiz →</button></div>
+      </div>`
+  },
+  {
+    id:'exam', icon:'🎓', name:'Exam Bank', exam:true, target:'right answers',
+    title:'Module 11 · Competency Exam Bank',
+    lesson:()=>`
+      <div class="card">
+        <h3>The real thing</h3>
+        <p>These are reconstructed from your competency document — the actual style and numbers you'll face. Every one is fully solved with dimensional analysis. Mix and match below.</p>
+        <p>The Practice tab serves these in random order. Take your time, write your setup on paper first, then check.</p>
+        <div class="callout tip"><b>Test-taking tip:</b> read the rounding instruction in each question <i>before</i> you start — "nearest tenth," "leading zero," "no trailing zero." Half the points on these exams are formatting.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Open the exam bank →</button></div>
+      </div>`
+  },
+  {
+    id:'guided', icon:'🧠', name:'Guided Walkthrough', guided:true, target:'walked through',
+    title:'Module 12 · Guided Walkthrough Test',
+    lesson:()=>`
+      <div class="card">
+        <h3>Think it through, one click at a time</h3>
+        <p>This is the big one for test prep. You get a random question from <b>any</b> topic, then you reveal the reasoning step by step — the exact thought process to run on test day:</p>
+        <ol class="steps">
+          <li>Read it — what unit are they asking for?</li>
+          <li>Pull out the info that actually matters (and ignore the noise).</li>
+          <li>Choose your approach / method.</li>
+          <li>Set up the equation.</li>
+          <li>Cancel the units.</li>
+          <li>Multiply &amp; divide.</li>
+          <li>Round &amp; format the ATI way.</li>
+        </ol>
+        <div class="callout tip"><b>Best way to use it:</b> read the question, try to predict each step in your head, <i>then</i> click to reveal and check yourself. Tell it honestly whether you got it — that's what builds the score.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Start the walkthrough →</button></div>
+      </div>`
+  },
+  {
+    id:'realtest', icon:'📝', name:'Real Test', realtest:true, target:'on the test',
+    title:'Module 13 · Real Practice Test',
+    lesson:()=>`
+      <div class="card">
+        <h3>No hints. Just like exam day.</h3>
+        <p>Pick a length and go. Questions span every topic and your real competency bank. You answer each one with <b>no feedback</b> until the end — then you get a score and a full review of everything you missed, with the worked setup.</p>
+        <div class="callout"><b>Rules of the room:</b> work each one on paper, mind your rounding and your zeros, and don't peek — the teaching already happened in the other modules. This is where you find out what stuck.</div>
+        <div class="callout tip">Score <b>80%+</b> to earn this module's ✓. Retake as many times as you want — fresh questions every time.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Set up a test →</button></div>
+      </div>`
+  },
+];
+
+// Curated real competency questions (verified answers)
+const EXAM=[
+  {prompt:`A vial contains <span class="ord">500 mg</span> reconstituted with <b>10 mL</b> sterile water. Order: 250 mg. How many mL? (Nearest tenth.)`,
+   chain:[{tv:250,tu:'mg',bv:1,bu:''},{tv:10,tu:'mL',bv:500,bu:'mg'}],target:'mL',round:'tenth'},
+  {prompt:`Order: <span class="ord">diphenhydramine 30 mg</span> IM. Available: 50 mg/1 mL. How many mL? (Nearest tenth, leading zero.)`,
+   chain:[{tv:30,tu:'mg',bv:1,bu:''},{tv:1,tu:'mL',bv:50,bu:'mg'}],target:'mL',round:'tenth'},
+  {prompt:`Order: <span class="ord">vancomycin 45 mg/kg/day</span> divided every 12 hr. Weight 198 lb. How many mg per dose? (Nearest whole.)`,
+   chain:[{tv:198,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:45,tu:'mg',bv:1,bu:'kg'}],target:'mg',round:'whole',divide:2},
+  {prompt:`Order: <span class="ord">ampicillin 500 mg</span> in 50 mL D5W over 30 min. Set the pump to how many mL/hr? (Nearest whole.)`,
+   chain:[{tv:50,tu:'mL',bv:30,bu:'min'},{tv:60,tu:'min',bv:1,bu:'hr'}],target:'mL/hr',round:'whole'},
+  {prompt:`Order: <span class="ord">vitamin K 1 mg</span> to a newborn. Available: 1 mg/0.5 mL. How many mL? (Nearest tenth.)`,
+   chain:[{tv:1,tu:'mg',bv:1,bu:''},{tv:0.5,tu:'mL',bv:1,bu:'mg'}],target:'mL',round:'tenth'},
+  {prompt:`Order: <span class="ord">mycostatin 600,000 units</span> PO. Available: 100,000 units/mL. How many mL? (Nearest whole.)`,
+   chain:[{tv:600000,tu:'units',bv:1,bu:''},{tv:1,tu:'mL',bv:100000,bu:'units'}],target:'mL',round:'whole'},
+  {prompt:`Order: <span class="ord">cefazolin 1 g in 100 mL</span> D5W over 20 min. Drop factor 15 gtt/mL. How many gtt/min? (Nearest whole.)`,
+   chain:[{tv:100,tu:'mL',bv:20,bu:'min'},{tv:15,tu:'gtt',bv:1,bu:'mL'}],target:'gtt/min',round:'whole'},
+  {prompt:`Order: <span class="ord">gabapentin 900 mg</span> PO. Available: 300 mg/capsule. How many capsules? (Nearest whole.)`,
+   chain:[{tv:900,tu:'mg',bv:1,bu:''},{tv:1,tu:'cap',bv:300,bu:'mg'}],target:'capsules',round:'whole'},
+  {prompt:`Order: <span class="ord">naproxen 500 mg</span> PO BID. Available: 125 mg/5 mL. How many mL? (Nearest whole.)`,
+   chain:[{tv:500,tu:'mg',bv:1,bu:''},{tv:5,tu:'mL',bv:125,bu:'mg'}],target:'mL',round:'whole'},
+  {prompt:`Order: <span class="ord">levothyroxine 0.175 mg</span> PO. Available: 88 mcg/tablet. How many tablets? (Nearest whole.)`,
+   chain:[{tv:0.175,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'tab',bv:88,bu:'mcg'}],target:'tablets',round:'whole'},
+  {prompt:`Order: <span class="ord">buspirone 7.5 mg</span> PO. Available: 15 mg/tablet (scored). How many tablets? (Nearest tenth.)`,
+   chain:[{tv:7.5,tu:'mg',bv:1,bu:''},{tv:1,tu:'tab',bv:15,bu:'mg'}],target:'tablets',round:'tenth'},
+  {prompt:`Order: <span class="ord">chlorpromazine 50 mg</span> IM. Available: 25 mg/mL. How many mL? (Nearest whole.)`,
+   chain:[{tv:50,tu:'mg',bv:1,bu:''},{tv:1,tu:'mL',bv:25,bu:'mg'}],target:'mL',round:'whole'},
+  {prompt:`Order: <span class="ord">250 mg</span> antibiotic IM. Available: 3 g/5 mL. How many mL? (Nearest tenth.)`,
+   chain:[{tv:250,tu:'mg',bv:1,bu:''},{tv:1,tu:'g',bv:1000,bu:'mg'},{tv:5,tu:'mL',bv:3,bu:'g'}],target:'mL',round:'tenth'},
+  {prompt:`Order: <span class="ord">heparin 2,000 units</span> IV bolus. Available: 5,000 units/mL. How many mL? (Nearest tenth.)`,
+   chain:[{tv:2000,tu:'units',bv:1,bu:''},{tv:1,tu:'mL',bv:5000,bu:'units'}],target:'mL',round:'tenth'},
+  {prompt:`Order: <span class="ord">enoxaparin 1 mg/kg/dose</span> SubQ. Weight 95 lb. How many mg per dose? (Nearest tenth.)`,
+   chain:[{tv:95,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:1,tu:'mg',bv:1,bu:'kg'}],target:'mg',round:'tenth'},
+  {prompt:`Order: <span class="ord">metoprolol 5 mg</span> IV bolus. Available: 1 mg/mL. How many mL? (Nearest whole.)`,
+   chain:[{tv:5,tu:'mg',bv:1,bu:''},{tv:1,tu:'mL',bv:1,bu:'mg'}],target:'mL',round:'whole'},
+];
+
+// Mixed pool for the walkthrough + real test (every topic)
+const POOL=[genConvert, ()=>genSolid(true), genLiquid, genInject, genWeight, genPump, genGtt];
+function randomProblem(){ return rand(POOL)(); }
+function testProblem(){ return Math.random()<0.45 ? structuredCopy(rand(EXAM)) : randomProblem(); }
+
+/* ============================================================
+   STATE / PROGRESS
+============================================================ */
+const KEY='dosagecalc.progress.v1';
+let state=load();
+function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch{return{};} }
+function save(){ localStorage.setItem(KEY,JSON.stringify(state)); }
+function modState(id){ if(!state[id]) state[id]={correct:0,attempts:0,done:false}; return state[id]; }
+const GOAL=5;
+
+let current='welcome', activeTab='learn';
+
+/* ============================================================
+   RENDER
+============================================================ */
+function renderNav(){
+  const nav=$('#nav'); nav.innerHTML='';
+  modules.forEach(m=>{
+    const s=modState(m.id);
+    const b=document.createElement('button');
+    b.className=(m.id===current?'active':'');
+    b.innerHTML=`<span class="ic">${m.icon}</span><span class="nm">${m.name}</span>${s.done?'<span class="ck">✓</span>':''}`;
+    b.onclick=()=>go(m.id);
+    nav.appendChild(b);
+  });
+  const total=modules.length;
+  const done=modules.filter(m=>modState(m.id).done).length;
+  $('#progbar').style.width=(done/total*100)+'%';
+  $('#progtext').textContent=`${done} of ${total} modules done`;
+}
+
+function go(id){ current=id; activeTab='learn'; renderNav(); renderMain(); window.scrollTo(0,0); }
+function openTab(t){ activeTab=t; renderMain(); }
+
+function renderMain(){
+  const m=modules.find(x=>x.id===current);
+  const s=modState(m.id);
+  let tabs='';
+  const practiceLabel = m.guided?'🧠 Walkthrough':m.realtest?'📝 Take the test':'✏️ Practice';
+  if(!m.noPractice){
+    tabs=`<div class="pill-tabs">
+      <button class="${activeTab==='learn'?'on':''}" onclick="openTab('learn')">📖 ${m.guided||m.realtest?'How it works':'Learn'}</button>
+      <button class="${activeTab==='practice'?'on':''}" onclick="openTab('practice')">${practiceLabel} ${s.done?'✓':''}</button>
+    </div>`;
+  }
+  let subline;
+  if(m.noPractice) subline='';
+  else if(m.guided) subline=`Walk through a question step by step. You've walked through ${s.correct} so far.`;
+  else if(m.realtest){ subline = s.best!=null ? `Your best score so far: ${s.best}%.` : 'Pick a length and go — no hints until the end.'; }
+  else subline=`Learn the idea, then practice until it sticks. Need ${GOAL} correct for a ✓ — you have ${s.correct}.`;
+  let body = (activeTab==='learn'||m.noPractice)? m.lesson() : renderPractice(m);
+  $('#main').innerHTML=`<h2 class="title">${m.title}</h2>
+     <p class="sub">${subline}</p>
+     ${tabs}${body}`;
+  if(activeTab==='practice' && !m.noPractice) mountPractice(m);
+}
+
+/* ---------- Practice (numeric) ---------- */
+let pq=null; // current problem
+function renderPractice(m){
+  if(m.mcq) return `<div id="pwrap"></div>`;
+  return `<div id="pwrap"></div>`;
+}
+function mountPractice(m){
+  if(m.guided){ mountGuided(m); return; }
+  if(m.realtest){ mountRealTest(m); return; }
+  if(m.mcq){ mountMCQ(m); return; }
+  newProblem(m);
+}
+function nextProblem(){ const m=modules.find(x=>x.id===current); newProblem(m); }
+
+function newProblem(m){
+  pq = m.exam ? structuredCopy(rand(EXAM)) : m.gen();
+  const s=modState(m.id);
+  const wrap=$('#pwrap');
+  wrap.innerHTML=`
+    <div class="qbox">
+      <div class="qmeta"><span>${m.icon} ${m.name}</span>
+        <span class="scorepill">✓ ${s.correct} correct · ${s.attempts} tried</span></div>
+      <div class="qprompt">${pq.prompt}</div>
+      ${pq.hint?`<div class="callout tip" style="margin-top:0">${pq.hint}</div>`:''}
+      <div class="answer-row">
+        <input id="ans" type="text" inputmode="decimal" placeholder="?" autocomplete="off">
+        <span class="unit-tag">${pq.target}</span>
+        <button class="btn" id="checkBtn">Check</button>
+        <button class="ghost btn" id="skipBtn">New question →</button>
+      </div>
+      <div class="feedback" id="fb"></div>
+    </div>`;
+  const input=$('#ans');
+  input.focus();
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter') doCheck(m); });
+  $('#checkBtn').onclick=()=>doCheck(m);
+  $('#skipBtn').onclick=()=>newProblem(m);
+}
+
+function doCheck(m){
+  const input=$('#ans');
+  const raw=input.value.trim();
+  if(raw==='') { input.focus(); return; }
+  const val=parseFloat(raw);
+  const expect=finalAnswer(pq);
+  const ok = Math.abs(val-expect) < 0.005 + Math.abs(expect)*0.001;
+  const s=modState(m.id);
+  s.attempts++;
+  const fb=$('#fb');
+  // formatting note
+  let fmtNote='';
+  if(ok){
+    if(/^\./.test(raw)) fmtNote=' <i>(Tip: add the leading zero — write 0'+raw+'.)</i>';
+    else if(/\.\d*0$/.test(raw)) fmtNote=' <i>(Tip: drop the trailing zero.)</i>';
+  }
+  const sol = pq.showMethods ? renderThreeMethods(pq) : renderChain(pq);
+  if(ok){
+    s.correct++;
+    if(s.correct>=GOAL && !s.done){ s.done=true; }
+    fb.className='feedback ok show';
+    fb.innerHTML=`<h5>✅ Correct — ${expect} ${pq.target}${fmtNote}</h5>
+      <div>Here's the setup:</div><div class="solution">${sol}</div>
+      <div class="start-row"><button class="btn" id="nextB">Next question →</button></div>`;
+  } else {
+    fb.className='feedback no show';
+    fb.innerHTML=`<h5>Not quite — the answer is ${expect} ${pq.target}</h5>
+      <div>You wrote ${raw}. Walk through it slowly:</div>
+      <div class="solution">${sol}</div>
+      <div class="start-row"><button class="btn" id="nextB">Try another →</button></div>`;
+  }
+  $('#nextB').onclick=()=>newProblem(m);
+  // disable inputs after checking
+  $('#checkBtn').disabled=true; input.disabled=true;
+  save(); renderNav();
+  $('#main').querySelector('.sub')?.replaceChildren();
+  // update sub line score
+  const sub=$('.sub'); if(sub) sub.textContent=`Learn the idea, then practice until it sticks. Need ${GOAL} correct for a ✓ — you have ${s.correct}.`;
+}
+
+/* ---------- Practice (MCQ for safety) ---------- */
+let mcqIdx=0;
+function mountMCQ(m){
+  mcqIdx=Math.floor(Math.random()*m.mcq.length);
+  drawMCQ(m);
+}
+function drawMCQ(m){
+  const s=modState(m.id);
+  const q=m.mcq[mcqIdx];
+  $('#pwrap').innerHTML=`
+    <div class="qbox">
+      <div class="qmeta"><span>${m.icon} Safety check</span><span class="scorepill">✓ ${s.correct} correct</span></div>
+      <div class="qprompt">${q.q}</div>
+      <div class="mcq" id="mcq">${q.a.map((a,i)=>`<button data-i="${i}">${a}</button>`).join('')}</div>
+      <div class="feedback" id="fb"></div>
+    </div>`;
+  $('#mcq').querySelectorAll('button').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=+btn.dataset.i; const correct=q.correct;
+      s.attempts++;
+      $('#mcq').querySelectorAll('button').forEach(b=>b.disabled=true);
+      btn.classList.add(i===correct?'correct':'wrong');
+      if(i!==correct) $('#mcq').querySelector(`[data-i="${correct}"]`).classList.add('correct');
+      const fb=$('#fb');
+      if(i===correct){ s.correct++; if(s.correct>=GOAL&&!s.done)s.done=true; fb.className='feedback ok show'; fb.innerHTML=`<h5>✅ Right.</h5><div>${q.why}</div>`; }
+      else { fb.className='feedback no show'; fb.innerHTML=`<h5>Not safe.</h5><div>${q.why}</div>`; }
+      fb.innerHTML+=`<div class="start-row"><button class="btn" id="nextB">Next →</button></div>`;
+      $('#nextB').onclick=()=>{ mcqIdx=(mcqIdx+1)%m.mcq.length; drawMCQ(m); };
+      save(); renderNav();
+      const sub=$('.sub'); if(sub) sub.textContent=`Learn the idea, then practice until it sticks. Need ${GOAL} correct for a ✓ — you have ${s.correct}.`;
+    };
+  });
+}
+
+function structuredCopy(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- Guided walkthrough ---------- */
+let gw=null; // {p, steps, shown}
+function mountGuided(m){ newGuided(m); }
+function newGuided(m){
+  const p=randomProblem();
+  gw={p, steps:buildWalkthrough(p), shown:0};
+  const s=modState(m.id);
+  $('#pwrap').innerHTML=`
+    <div class="qbox">
+      <div class="qmeta"><span>🧠 Walkthrough · random topic</span>
+        <span class="scorepill">walked through ${s.correct}</span></div>
+      <div class="qprompt">${p.prompt}</div>
+      <div class="answer-row" style="margin-bottom:6px">
+        <input id="gans" type="text" inputmode="decimal" placeholder="your guess (optional)" autocomplete="off" style="width:200px">
+        <span class="unit-tag">${p.target}</span>
+      </div>
+      <div id="gsteps"></div>
+      <div class="start-row" id="gctrl"></div>
+    </div>`;
+  drawGuided(m);
+}
+function drawGuided(m){
+  const box=$('#gsteps');
+  box.innerHTML = gw.steps.slice(0,gw.shown).map(st=>
+    `<div class="card" style="margin:12px 0 0;background:#0c1322"><h4 style="margin-top:0;color:var(--indigo)">${st.title}</h4>${st.html}</div>`
+  ).join('');
+  const ctrl=$('#gctrl');
+  if(gw.shown < gw.steps.length){
+    const next=gw.steps[gw.shown];
+    ctrl.innerHTML=`<button class="btn" id="gnext">→ Reveal: ${next.title.replace(/^\d+ · /,'')}</button>`;
+    $('#gnext').onclick=()=>{ gw.shown++; drawGuided(m); window.scrollTo(0,document.body.scrollHeight); };
+  } else {
+    ctrl.innerHTML=`<div style="width:100%"><p style="margin:14px 0 8px">How did you do on this one?</p>
+      <div class="start-row">
+        <button class="btn" id="ggot">✅ I got it right</button>
+        <button class="ghost btn" id="gmiss">✗ I missed it</button>
+        <button class="ghost btn" id="gskip">New question →</button>
+      </div></div>`;
+    const finish=(right)=>{ const s=modState(m.id); s.attempts++; if(right){ s.correct++; if(s.correct>=GOAL&&!s.done)s.done=true; } save(); renderNav(); newGuided(m); };
+    $('#ggot').onclick=()=>finish(true);
+    $('#gmiss').onclick=()=>finish(false);
+    $('#gskip').onclick=()=>newGuided(m);
+  }
+}
+
+/* ---------- Real practice test ---------- */
+let test=null; // {qs:[], i, answers:[]}
+function mountRealTest(m){ testStart(m); }
+function testStart(m){
+  test=null;
+  $('#pwrap').innerHTML=`
+    <div class="qbox">
+      <div class="qprompt">How many questions?</div>
+      <div class="seg" id="lenseg">
+        <button data-n="10">10 — quick</button>
+        <button data-n="20" class="on">20 — standard</button>
+        <button data-n="30">30 — full</button>
+      </div>
+      <div class="start-row"><button class="btn" id="tstart">Begin test →</button></div>
+    </div>`;
+  let n=20;
+  $('#lenseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    n=+b.dataset.n; $('#lenseg').querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  });
+  $('#tstart').onclick=()=>{
+    const qs=[]; for(let k=0;k<n;k++) qs.push(testProblem());
+    test={qs, i:0, answers:[]};
+    testQuestion(m);
+  };
+}
+function testQuestion(m){
+  const p=test.qs[test.i];
+  $('#pwrap').innerHTML=`
+    <div class="qbox">
+      <div class="qmeta"><span>📝 Question ${test.i+1} of ${test.qs.length}</span>
+        <span class="scorepill">no hints — answer & submit</span></div>
+      <div class="bar" style="margin-bottom:14px"><i style="width:${(test.i/test.qs.length*100)}%"></i></div>
+      <div class="qprompt">${p.prompt}</div>
+      ${p.hint?`<div class="callout tip" style="margin-top:0">${p.hint}</div>`:''}
+      <div class="answer-row">
+        <input id="tans" type="text" inputmode="decimal" placeholder="?" autocomplete="off">
+        <span class="unit-tag">${p.target}</span>
+        <button class="btn" id="tsub">${test.i===test.qs.length-1?'Submit & finish':'Submit & next →'}</button>
+      </div>
+    </div>`;
+  const input=$('#tans'); input.focus();
+  const submit=()=>{
+    const raw=input.value.trim();
+    const val=raw===''?NaN:parseFloat(raw);
+    const expect=finalAnswer(p);
+    const ok=Math.abs(val-expect)<0.005+Math.abs(expect)*0.001;
+    test.answers.push({p, raw:raw===''?'(blank)':raw, expect, ok});
+    test.i++;
+    if(test.i<test.qs.length) testQuestion(m); else testResults(m);
+  };
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter') submit(); });
+  $('#tsub').onclick=submit;
+}
+function testResults(m){
+  const total=test.answers.length;
+  const correct=test.answers.filter(a=>a.ok).length;
+  const pct=Math.round(correct/total*100);
+  const s=modState(m.id); s.attempts++;
+  if(s.best==null||pct>s.best) s.best=pct;
+  if(pct>=80) s.done=true;
+  save(); renderNav();
+  const grade = pct>=90?'Outstanding.':pct>=80?'Solid — you\'re test-ready.':pct>=70?'Almost there — review the misses.':'Keep drilling — you\'ve got this.';
+  const wrong=test.answers.filter(a=>!a.ok);
+  const review = wrong.length
+    ? `<h4>Review the ${wrong.length} you missed</h4>` + wrong.map(a=>`
+        <div class="card" style="margin:10px 0;background:#0c1322">
+          <div class="qprompt" style="font-size:15px">${a.p.prompt}</div>
+          <p style="color:var(--bad)">You wrote: ${a.raw} &nbsp;·&nbsp; <span style="color:var(--good)">Correct: ${a.expect} ${a.p.target}</span></p>
+          <div class="solution">${a.p.showMethods?renderThreeMethods(a.p):renderChain(a.p)}</div>
+        </div>`).join('')
+    : `<div class="callout tip"><b>Perfect score — every single one.</b> 🎉</div>`;
+  $('#pwrap').innerHTML=`
+    <div class="qbox">
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:46px;font-weight:800;color:${pct>=80?'var(--good)':pct>=70?'var(--amber)':'var(--bad)'}">${pct}%</div>
+        <div style="font-size:18px">${correct} / ${total} correct</div>
+        <p class="sub" style="margin-top:6px">${grade}</p>
+      </div>
+      ${review}
+      <div class="start-row" style="margin-top:18px">
+        <button class="btn" id="tretake">↺ Take another test</button>
+      </div>
+    </div>`;
+  $('#tretake').onclick=()=>testStart(m);
+}
+
+/* reset */
+$('#resetBtn').onclick=()=>{
+  if(confirm('Reset all progress? This clears your checkmarks and scores.')){
+    state={}; save(); go('welcome');
+  }
+};
+
+/* boot */
+renderNav(); renderMain();
+</script>
+</body>
+</html>
