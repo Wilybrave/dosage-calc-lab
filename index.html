@@ -47,6 +47,8 @@
   nav button .ck{font-size:13px; color:var(--good)}
   .side .reset{margin-top:14px; font-size:12px; color:var(--muted); background:none; border:1px dashed var(--line); width:100%; padding:8px; border-radius:8px; cursor:pointer}
   .side .reset:hover{color:var(--bad)}
+  .navlabel{display:flex; align-items:center; gap:8px; margin:16px 6px 6px; font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--amber); text-transform:uppercase}
+  .navlabel::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--amber),transparent); opacity:.4}
 
   /* Main */
   main{flex:1; padding:34px 40px 80px; max-width:920px}
@@ -206,10 +208,14 @@ function finalAnswer(p){
   if(p.divide) v=v/p.divide;
   return roundDose(v,p.round);
 }
+// A factor's units. tu/bu are single-unit shorthand; tus/bus allow COMPOUND
+// denominators (or numerators) like mcg/(kg·min) used in critical-care drips.
+function topUnits(f){ return f.tus || (f.tu? [f.tu] : []); }
+function botUnits(f){ return f.bus || (f.bu? [f.bu] : []); }
 // strike units that appear in both a top and a bottom somewhere in the chain
 function cancelSet(chain){
   const tops=new Set(), bots=new Set();
-  chain.forEach(f=>{ if(f.tu) tops.add(f.tu); if(f.bu) bots.add(f.bu); });
+  chain.forEach(f=>{ topUnits(f).forEach(u=>tops.add(u)); botUnits(f).forEach(u=>bots.add(u)); });
   const c=new Set();
   tops.forEach(u=>{ if(bots.has(u)) c.add(u); });
   return c;
@@ -222,9 +228,11 @@ function renderChainOpts(p,opts){
   let html=`<div class="da"><span class="eq">X ${p.target} =</span>`;
   p.chain.forEach((f,i)=>{
     if(i>0) html+=`<span class="op">×</span>`;
-    const single = (f.bv===1 && !f.bu);
-    const tu = f.tu? `<span class="unit ${cancel.has(f.tu)?'struck':''}"> ${f.tu}</span>`:'';
-    const bu = f.bu? `<span class="unit ${cancel.has(f.bu)?'struck':''}"> ${f.bu}</span>`:'';
+    const tU=topUnits(f), bU=botUnits(f);
+    const single = (f.bv===1 && bU.length===0);
+    const uspan=u=>`<span class="unit ${cancel.has(u)?'struck':''}"> ${u}</span>`;
+    const tu = tU.map(uspan).join('');
+    const bu = bU.map(uspan).join('');
     html+=`<div class="frac ${single?'single':''}">
         <div class="top"><span class="num">${fmtNum(f.tv)}</span>${tu}</div>
         ${single?'':`<div class="bot"><span class="num">${fmtNum(f.bv)}</span>${bu}</div>`}
@@ -318,7 +326,7 @@ function genSolid(withConv=false){
         chain:[{tv:D/1000,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'tab',bv:H,bu:'mcg'}],target:'tablets',round:'whole'};
     } else { // available mg, order g
       return {prompt:`Order: <span class="ord">${drug} ${D/1000} g</span> PO. Available: ${drug} <b>${H} mg</b> tablets. How many tablets per dose? (Round to nearest whole number.)`,
-        chain:[{tv:D/1000,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'tab',bv:H,bu:'g'}],target:'tablets',round:'whole'};
+        chain:[{tv:D/1000,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'tab',bv:H,bu:'mg'}],target:'tablets',round:'whole'};
     }
   }
   return {prompt:`Order: <span class="ord">${drug} ${D} mg</span> PO. Available: ${drug} <b>${H} mg</b> tablets. How many tablets per dose? (Round to nearest whole number.)`,
@@ -699,6 +707,193 @@ const modules=[
         <div class="start-row"><button class="btn" onclick="openTab('practice')">Set up a test →</button></div>
       </div>`
   },
+
+  /* ===================== LEVEL 2 ===================== */
+  { divider:true, name:'Level 2 · NCLEX Hard' },
+  {
+    id:'l2intro', icon:'🚀', name:'Level 2: How to chain', noPractice:true,
+    title:'Level 2 · Multi-Step Problems (how to do them)',
+    lesson:()=>`
+      <div class="card">
+        <p class="lead">Level 1 problems were <b>one jump</b> — mg to mL, lb to kg, done. Real NCLEX questions stack the jumps: the order is in <b>grams</b> but the vial is in <b>mg</b>; the drug is dosed <b>per kg per day</b> and then <b>split into doses</b>; the bag gives you <b>units per hour</b> and wants <b>mL per hour</b>. Same math you already know — just more links in the chain.</p>
+        <div class="callout tip"><b>Here's the secret the textbook buries:</b> dimensional analysis doesn't care how many jumps there are. You keep adding fractions, each one cancelling the unit you don't want, until only the target survives. Two jumps, four jumps — identical process. If the units cancel down to the answer, the math is right.</div>
+
+        <h3>The "for dummies" system — run this every single time</h3>
+        <ol class="steps">
+          <li><b>Write the target unit and box it.</b> mL? mg? mL/hr? That's the only unit allowed to survive at the end. Everything else must cancel.</li>
+          <li><b>List every fact as a fraction.</b> The order, every conversion (1 g = 1,000 mg…), the strength on hand, the bag size. Don't calculate yet — just collect.</li>
+          <li><b>Lay the ordered amount down first.</b> Over 1.</li>
+          <li><b>Add the bridge conversion next.</b> If the order's unit doesn't match the label's unit, this is the jump people skip. Put it in so the mismatched unit cancels.</li>
+          <li><b>Add the strength / rate.</b> Now you're in the label's world; multiply by the per-mL (or per-tab, or per-hr) factor.</li>
+          <li><b>Cancel diagonally.</b> Cross out every unit that's on a top <i>and</i> a bottom. Only the boxed target should remain.</li>
+          <li><b>Multiply tops, multiply bottoms, divide.</b> Then handle any "divided into X doses" split, and round the ATI way.</li>
+        </ol>
+
+        <h4>Watch a 4-jump problem fall apart cleanly</h4>
+        <p><b>Order:</b> amoxicillin 40 mg/kg/day divided every 8 hr. <b>Child weighs 44 lb.</b> <b>Available:</b> 250 mg / 5 mL. <i>How many mL per dose?</i></p>
+        ${renderChain({target:'mL',round:'tenth',divide:3,chain:[{tv:44,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:40,tu:'mg',bv:1,bu:'kg'},{tv:5,tu:'mL',bv:250,bu:'mg'}]})}
+        <div class="callout"><b>Read the cancels left to right:</b> lb cancels lb → you're in kg. kg cancels kg → you're in mg per day. mg cancels mg → you're in mL per day. Then the only thing left to do is the human step: split the day into 3 doses. <b>The unit told you when to stop converting.</b></div>
+        <div class="callout warn"><b>The #1 Level-2 trap:</b> stopping early. The chain above naturally lands on mL <i>per day</i>. The question asked <i>per dose</i>. Always re-read the last line of the question after you get a number — "per dose," "per hour," "daily total" change the answer.</div>
+
+        <h4>What's in Level 2</h4>
+        <ul class="tidy">
+          <li><b>⚖️ Weight (hard)</b> — per kg/day, divided doses, all the way to mL or mg per dose.</li>
+          <li><b>💉 Injectable (hard)</b> — order in g or mg, vial in mg or mcg. The conversion hides inside.</li>
+          <li><b>💊 Oral (hard)</b> — grams to tablets/mL, and household spoons to mg.</li>
+          <li><b>🧪 Parenteral / IV (hard)</b> — a rate in (units/hr, mg/hr, L over hr), a pump rate out (mL/hr).</li>
+          <li><b>⚗️ Powdered (hard)</b> — reconstitution: you build the concentration before you can use it.</li>
+          <li><b>🫀 Drips (mcg/kg/min)</b> — the boss level: compound denominators, five-factor chains, straight to mL/hr.</li>
+          <li><b>🧨 Level 2 Test</b> — all six mixed, no hints, scored.</li>
+        </ul>
+        <div class="callout tip"><b>You're not learning new math here.</b> You already know how to cancel units. Level 2 just trusts you to do it three or four times in a row without flinching. Start with Weight.</div>
+        <div class="start-row"><button class="btn" onclick="go('h-weight')">Start Level 2 → Weight</button></div>
+      </div>`
+  },
+  {
+    id:'h-weight', icon:'⚖️', name:'Weight (hard)', gen:genWeightHard, target:'right answers',
+    title:'Level 2 · Dosages by Weight',
+    lesson:()=>`
+      <div class="card">
+        <h3>Weight-based, taken all the way</h3>
+        <p>Level 1 stopped at "mg per day." NCLEX rarely does. It chains the weight conversion into the daily dose, splits it into individual doses, and often makes you finish in <b>mL</b> using a suspension strength. That's up to <b>four jumps plus a split</b> in one problem.</p>
+        <h4>The order of operations that never changes</h4>
+        <ol class="steps">
+          <li><b>lb → kg</b> (÷ 2.2). Drug doses are written per kg, always.</li>
+          <li><b>× mg/kg/day</b> → that's the <i>total for the whole day</i>.</li>
+          <li><b>÷ number of doses</b> → q12h = 2, q8h = 3, q6h = 4.</li>
+          <li><b>× strength (mL per mg)</b> if they want a volume, not a number of mg.</li>
+        </ol>
+        <h4>Worked example — finish in mL</h4>
+        <p><b>Order:</b> cephalexin 50 mg/kg/day divided q6h. <b>Weight:</b> 66 lb. <b>Available:</b> 125 mg/5 mL.</p>
+        ${renderChain({target:'mL',round:'tenth',divide:4,chain:[{tv:66,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:50,tu:'mg',bv:1,bu:'kg'},{tv:5,tu:'mL',bv:125,bu:'mg'}]})}
+        <div class="callout warn"><b>The chain gives you mL per <i>day</i>.</b> The "÷ 4 doses" is the step the question is really testing. Per dose ≠ per day.</div>
+        <div class="callout tip"><b>Safe-dose habit:</b> on the real exam, after you get the daily mg, glance at whether it's a sane amount for a kid that size. A wildly large number means you flipped lb and kg.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice weight (hard) →</button></div>
+      </div>`
+  },
+  {
+    id:'h-inject', icon:'💉', name:'Injectable (hard)', gen:genInjectHard, target:'right answers',
+    title:'Level 2 · Injectable Medications',
+    lesson:()=>`
+      <div class="card">
+        <h3>When the order and the vial speak different units</h3>
+        <p>The injectable math is still "dose ÷ strength = mL." What makes it hard is that the <b>order is in grams</b> (or mg) while the <b>vial is in mg</b> (or mcg). You can't divide until both sides match — so a conversion fraction rides in the middle of the chain.</p>
+        <h4>Worked example — g order, mg vial</h4>
+        <p><b>Order:</b> ceftriaxone 0.5 g IM. <b>Available:</b> 250 mg/mL.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:0.5,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'mL',bv:250,bu:'mg'}]})}
+        <p>g cancels g → you're in mg → mg cancels mg → mL survives.</p>
+        <h4>Worked example — mg order, mcg vial (high-alert)</h4>
+        <p><b>Order:</b> digoxin 0.125 mg IV. <b>Available:</b> 250 mcg/mL.</p>
+        ${renderChain({target:'mL',round:'hundredth',chain:[{tv:0.125,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'mL',bv:250,bu:'mcg'}]})}
+        <div class="callout warn"><b>Digoxin, fentanyl, hydromorphone</b> live in this mg-vs-mcg gap. A skipped conversion here is a 1,000× error, not a typo. The leading zero rule (<code class="k">0.5 mL</code>, never <code class="k">.5</code>) matters most on exactly these drugs.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice injectable (hard) →</button></div>
+      </div>`
+  },
+  {
+    id:'h-oral', icon:'💊', name:'Oral (hard)', gen:genOralHard, target:'right answers',
+    title:'Level 2 · Oral Medications',
+    lesson:()=>`
+      <div class="card">
+        <h3>Grams, tablets, and the household spoon</h3>
+        <p>Oral orders love to mismatch units two ways: the order is in <b>grams</b> while the bottle is in <b>mg</b>, or the dose is in <b>teaspoons/tablespoons</b> while the label is in <b>mg/mL</b>. Both are just an extra conversion fraction.</p>
+        <h4>Worked example — g → mg → mL</h4>
+        <p><b>Order:</b> amoxicillin 0.5 g PO. <b>Available:</b> 250 mg/5 mL.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:0.5,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:5,tu:'mL',bv:250,bu:'mg'}]})}
+        <h4>Worked example — the spoon (tsp → mL → mg)</h4>
+        <p><b>Question:</b> a caregiver gives 1.5 tsp of a 250 mg/5 mL suspension. How many mg is that?</p>
+        ${renderChain({target:'mg',round:'whole',chain:[{tv:1.5,tu:'tsp',bv:1,bu:''},{tv:5,tu:'mL',bv:1,bu:'tsp'},{tv:250,tu:'mg',bv:5,bu:'mL'}]})}
+        <div class="callout"><b>Household conversions you'll need:</b> 1 tsp = 5 mL · 1 tbsp = 15 mL · 1 oz = 30 mL. These are the bridges that turn a spoon into a dose.</div>
+        <div class="callout tip"><b>Tablets round to whole</b> (unless scored). If g → mg → tablets gives 1.9 tablets of an unscored pill, the answer the exam wants is 2 — but always double-check the math first; a near-miss often means a flipped fraction.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice oral (hard) →</button></div>
+      </div>`
+  },
+  {
+    id:'h-iv', icon:'🧪', name:'Parenteral / IV (hard)', gen:genIVHard, target:'right answers',
+    title:'Level 2 · Parenteral (IV) Medications',
+    lesson:()=>`
+      <div class="card">
+        <h3>A rate in, a rate out</h3>
+        <p>The hardest IV questions hand you a <b>dose rate</b> — heparin at units/hr, a drip at mg/hr — and a <b>bag concentration</b>, and ask for the <b>pump rate in mL/hr</b>. It looks scary; it's one chain. The dose unit cancels against the bag, and mL/hr is what's left.</p>
+        <h4>Worked example — heparin units/hr → mL/hr</h4>
+        <p><b>Order:</b> heparin at 1,000 units/hr. <b>Available:</b> 25,000 units in 500 mL NS.</p>
+        ${renderChain({target:'mL/hr',round:'whole',chain:[{tv:1000,tu:'units',bv:1,bu:'hr'},{tv:500,tu:'mL',bv:25000,bu:'units'}]})}
+        <p>units cancel units; mL stays on top, hr stays on bottom = <b>mL/hr</b>, exactly what the pump wants.</p>
+        <h4>Worked example — liters over hours</h4>
+        <p><b>Order:</b> infuse 1 L of LR over 8 hr.</p>
+        ${renderChain({target:'mL/hr',round:'whole',chain:[{tv:1,tu:'L',bv:8,bu:'hr'},{tv:1000,tu:'mL',bv:1,bu:'L'}]})}
+        <div class="callout warn"><b>Don't infuse "1" mL/hr.</b> A liter is 1,000 mL — convert before you divide by the hours, or you'll be off by 1,000×.</div>
+        <div class="callout tip"><b>Gut check every pump rate:</b> a half-liter bag over 4 hr is ~125 mL/hr. If your answer is wildly off that scale, a fraction is upside down.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice IV (hard) →</button></div>
+      </div>`
+  },
+  {
+    id:'h-powder', icon:'⚗️', name:'Powdered (hard)', gen:genPowderHard, target:'right answers',
+    title:'Level 2 · Powdered (Reconstituted) Medications',
+    lesson:()=>`
+      <div class="card">
+        <h3>You build the concentration first</h3>
+        <p>Powdered drugs ship as dry powder. A nurse adds diluent, and only <i>then</i> is there a mg/mL strength to calculate with. Two flavors on the exam:</p>
+        <ul class="tidy">
+          <li><b>Label tells you the final concentration</b> (e.g. "yields 225 mg/mL"). Use it like any strength — but watch for a g order that needs converting first.</li>
+          <li><b>Label makes you compute it:</b> all the powder (say 1 g) now lives in the <b>final volume</b> (say 4 mL). Your strength is total drug ÷ final volume.</li>
+        </ul>
+        <h4>Worked example — concentration stated, g order</h4>
+        <p><b>Vial:</b> reconstitute, final concentration 225 mg/mL. <b>Order:</b> cefazolin 0.5 g IM.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:0.5,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'mL',bv:225,bu:'mg'}]})}
+        <h4>Worked example — you compute the concentration</h4>
+        <p><b>Vial:</b> 1 g reconstituted to a final volume of 4 mL. <b>Order:</b> 600 mg IM.</p>
+        ${renderChain({target:'mL',round:'tenth',chain:[{tv:600,tu:'mg',bv:1,bu:''},{tv:1,tu:'g',bv:1000,bu:'mg'},{tv:4,tu:'mL',bv:1,bu:'g'}]})}
+        <div class="callout"><b>The reconstitution fraction is "all the powder over the final volume":</b> 1 g per 4 mL. Drop it into the chain like a strength and let the units cancel.</div>
+        <div class="callout warn"><b>Use the FINAL volume, not the diluent added.</b> Dry powder takes up space, so "add 3.4 mL" can yield 4 mL. The exam will hand you the final volume — use that one.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice powdered (hard) →</button></div>
+      </div>`
+  },
+  {
+    id:'h-drip', icon:'🫀', name:'Drips (mcg/kg/min)', gen:genDripHard, target:'right answers',
+    title:'Level 2 · Compound Denominators (Critical-Care Drips)',
+    lesson:()=>`
+      <div class="card">
+        <h3>The boss level — and the one that makes everything else feel easy</h3>
+        <p>Up to now every dose had <b>one</b> thing on the bottom: mg per <i>mL</i>, mg per <i>kg</i>. A titrated drip stacks them: dopamine is ordered <code class="k">mcg/kg/min</code> — that's a dose per <b>kilogram</b> AND per <b>minute</b>, both on the bottom of the same fraction. Two units down there is the only new idea on this whole page.</p>
+        <div class="callout tip"><b>Here's why it's not actually harder:</b> you don't do anything new. A unit on the bottom gets cancelled by the same unit on a top — so two bottom units just means you bring <b>two cancelling factors</b>: the patient's <b>weight</b> (a "kg" on top) to kill the kg, and <b>60 min/hr</b> (a "min" on top) to kill the min and land in hours. Same cancelling game, just longer.</p>
+
+        <h4>The recipe for every mcg/kg/min drip</h4>
+        <ol class="steps">
+          <li><b>Target:</b> the pump wants <code class="k">mL/hr</code>. Box it.</li>
+          <li><b>Start with the dose rate</b> — the whole <code class="k">mcg / (kg · min)</code> as one fraction. Both kg and min sit on the bottom.</li>
+          <li><b>× weight (kg)</b> → cancels the kg. Now you have mcg/min.</li>
+          <li><b>× 60 min/hr</b> → cancels the min. Now you have mcg/hr.</li>
+          <li><b>× 1 mg / 1000 mcg</b> → the bag is labeled in mg, so convert. Now mg/hr.</li>
+          <li><b>× bag mL / bag mg</b> → cancels mg. Only <b>mL/hr</b> survives.</li>
+        </ol>
+
+        <h4>Watch all five factors cancel down to one answer</h4>
+        <p><b>Order:</b> dopamine 5 mcg/kg/min. <b>Weight:</b> 70 kg. <b>Available:</b> 400 mg in 250 mL D5W.</p>
+        ${renderChain({target:'mL/hr',round:'tenth',chain:[
+          {tv:5,tu:'mcg',bv:1,bus:['kg','min']},
+          {tv:70,tu:'kg',bv:1,bu:''},
+          {tv:60,tu:'min',bv:1,bu:'hr'},
+          {tv:1,tu:'mg',bv:1000,bu:'mcg'},
+          {tv:250,tu:'mL',bv:400,bu:'mg'}
+        ]})}
+        <div class="callout"><b>Read the wreckage:</b> kg cancels (dose vs weight), min cancels (dose vs the 60), mcg cancels (dose vs the mg bridge), mg cancels (bridge vs bag). Five fractions in, one unit out: <b>mL/hr</b>. If anything but mL/hr survives, a factor is flipped or missing.</div>
+        <div class="callout warn"><b>Don't skip the weight.</b> The #1 drip error is forgetting that the dose is <i>per kg</i> — you must multiply by the patient's weight, or every kg of them is dosed as if they weigh 1.</div>
+        <div class="callout tip"><b>Now flip back to any earlier module.</b> A plain "0.5 g, available 250 mg/mL" is a two-step stroll after this. That's the point.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Practice drips →</button></div>
+      </div>`
+  },
+  {
+    id:'h-test', icon:'🧨', name:'Level 2 Test', realtest:true, hardPool:true, target:'on the test',
+    title:'Level 2 · Mixed NCLEX Test',
+    lesson:()=>`
+      <div class="card">
+        <h3>All six, mixed, no hints.</h3>
+        <p>Every question is a multi-step problem pulled at random from the six Level-2 categories — weight, injectable, oral, IV, powdered, and critical-care drips. No hints until the end, then a full worked review of everything you missed.</p>
+        <div class="callout warn"><b>Two things kill people here:</b> stopping at the wrong unit (mg/day vs mg/dose), and skipping the buried conversion (g→mg, L→mL, units→mL). Read the last line of every question twice.</div>
+        <div class="callout tip">Score <b>80%+</b> for the ✓. Fresh questions every retake.</div>
+        <div class="start-row"><button class="btn" onclick="openTab('practice')">Set up the Level 2 test →</button></div>
+      </div>`
+  },
 ];
 
 // Curated real competency questions (verified answers)
@@ -743,6 +938,190 @@ function randomProblem(){ return rand(POOL)(); }
 function testProblem(){ return Math.random()<0.45 ? structuredCopy(rand(EXAM)) : randomProblem(); }
 
 /* ============================================================
+   LEVEL 2 — multi-step / NCLEX-hard generators
+   Every one of these forces 2+ "jumps" in a single chain:
+   a unit conversion AND a strength/rate factor (sometimes a
+   divided-dose split on top). Same engine, harder questions.
+============================================================ */
+// lb values that divide cleanly by 2.2 → tidy kg (10..100)
+const CLEAN_LB=[33,44,55,66,77,88,99,110,121,132];
+
+// 1 · Dosages by weight → all the way to a deliverable dose (mL or tabs)
+function genWeightHard(){
+  if(Math.random()<0.6){
+    // weight → kg → mg/day → mL/day → ÷doses → mL/dose  (4 jumps + split)
+    // retry until the per-dose volume lands in a clinically sane band
+    for(let tries=0;tries<40;tries++){
+      const lb=rand([22,33,44,55,66]); // pediatric weights (kg 10..30)
+      const [name,H,Q]=rand([['amoxicillin',250,5],['cephalexin',250,5],['acetaminophen',160,5],['cefdinir',125,5]]);
+      const R=rand([20,25,30,40,45]);
+      const every=rand([6,8,12]); const doses=24/every;
+      const p={prompt:`Order: <span class="ord">${name} ${R} mg/kg/day</span> PO divided every ${every} hr. The child weighs <b>${lb} lb</b>. Available: ${name} oral suspension <b>${H} mg/${Q} mL</b>. How many mL per <u>dose</u>? (Round to the nearest tenth.)`,
+        chain:[{tv:lb,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:R,tu:'mg',bv:1,bu:'kg'},{tv:Q,tu:'mL',bv:H,bu:'mg'}],
+        target:'mL', round:'tenth', divide:doses,
+        hint:`Four jumps: lb → kg → mg/day → mL/day, <i>then</i> split into ${doses} doses. The chain gives mL per day — don't forget the last ÷${doses}.`};
+      const a=finalAnswer(p);
+      if(a>=2 && a<=20) return p;
+    }
+  }
+  const lb=rand(CLEAN_LB);
+  // weight → kg → mg/day → ÷doses → mg/dose, where the order is per kg/day
+  const [name,R]=rand([['vancomycin',45],['gentamicin',7.5],['acyclovir',30],['ampicillin',100],['cefotaxime',150]]);
+  const every=rand([6,8,12]); const doses=24/every;
+  return {prompt:`Order: <span class="ord">${name} ${R} mg/kg/day</span> IV divided every ${every} hr. The child weighs <b>${lb} lb</b>. How many mg per <u>dose</u>? (Round to the nearest whole number.)`,
+    chain:[{tv:lb,tu:'lb',bv:1,bu:''},{tv:1,tu:'kg',bv:2.2,bu:'lb'},{tv:R,tu:'mg',bv:1,bu:'kg'}],
+    target:'mg', round:'whole', divide:doses,
+    hint:`lb → kg → mg per <i>day</i>, then split into ${doses} equal doses.`};
+}
+
+// 2 · Injectable → order unit ≠ label unit, so a conversion rides inside the chain
+function genInjectHard(){
+  if(Math.random()<0.55){
+    // g ordered, mg/mL on hand:  g → mg → mL
+    const [name,H]=rand([['ceftriaxone',250],['ampicillin',125],['nafcillin',100],['cefazolin',225],['vancomycin',500]]);
+    const g=rand([0.25,0.5,0.75,1]);
+    return {prompt:`Order: <span class="ord">${name} ${g} g</span> IM. Available: ${name} <b>${H} mg/mL</b>. How many mL? (Round to the nearest tenth.)`,
+      chain:[{tv:g,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'mL',bv:H,bu:'mg'}],
+      target:'mL', round:'tenth',
+      hint:`The order is in g but the vial is in mg. Bridge with 1 g = 1,000 mg, <i>then</i> use the strength.`};
+  }
+  // mg ordered, mcg/mL on hand:  mg → mcg → mL  (high-alert: digoxin etc.)
+  const [name,H]=rand([['digoxin',250],['fentanyl',50],['hydromorphone',500],['glycopyrrolate',200]]);
+  const D=rand([0.1,0.125,0.2,0.25,0.5]);
+  return {prompt:`Order: <span class="ord">${name} ${D} mg</span> IV. Available: ${name} <b>${H} mcg/mL</b>. How many mL? (Round to the nearest hundredth.)`,
+    chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:1000,tu:'mcg',bv:1,bu:'mg'},{tv:1,tu:'mL',bv:H,bu:'mcg'}],
+    target:'mL', round:'hundredth',
+    hint:`mg → mcg first (1 mg = 1,000 mcg), then divide by the mcg/mL strength.`};
+}
+
+// 3 · Oral → conversions both ways: g→mg→mL/tabs, and household tsp→mL→mg
+function genOralHard(){
+  const pick=Math.random();
+  if(pick<0.4){
+    // g → mg → mL (liquid)
+    const [name,H,Q]=rand([['amoxicillin',250,5],['cephalexin',250,5],['penicillin V',125,5],['azithromycin',200,5]]);
+    const g=rand([0.25,0.5,0.75,1]);
+    return {prompt:`Order: <span class="ord">${name} ${g} g</span> PO. Available: ${name} oral solution <b>${H} mg/${Q} mL</b>. How many mL? (Round to the nearest tenth.)`,
+      chain:[{tv:g,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:Q,tu:'mL',bv:H,bu:'mg'}],
+      target:'mL', round:'tenth',
+      hint:`g → mg → mL. Convert the gram order to mg before you touch the strength.`};
+  }
+  if(pick<0.7){
+    // g → mg → tablets  (pick the count first so it's always a clean 1–3 tabs)
+    const [name,H]=rand([['metformin',500],['valacyclovir',500],['cephalexin',250],['acetaminophen',500],['amoxicillin',250]]);
+    const count=rand([1,2,3]);
+    const g=+(count*H/1000); // e.g. 500 mg × 2 = 1 g
+    return {prompt:`Order: <span class="ord">${name} ${g} g</span> PO. Available: ${name} <b>${H} mg</b> tablets. How many tablets? (Round to the nearest whole number.)`,
+      chain:[{tv:g,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'tab',bv:H,bu:'mg'}],
+      target:'tablets', round:'whole',
+      hint:`g → mg → tablets. 1 g = 1,000 mg, then divide by the tablet strength.`};
+  }
+  // household tsp → mL → mg  (how much drug is in that spoonful?)
+  const [name,H,Q]=rand([['amoxicillin',250,5],['acetaminophen',160,5],['ibuprofen',100,5],['cefdinir',125,5]]);
+  const tsp=rand([0.5,1,1.5,2]);
+  return {prompt:`A caregiver gives <span class="ord">${tsp} tsp</span> of ${name} <b>${H} mg/${Q} mL</b>. How many mg did the child receive? (Round to the nearest whole number.)`,
+    chain:[{tv:tsp,tu:'tsp',bv:1,bu:''},{tv:5,tu:'mL',bv:1,bu:'tsp'},{tv:H,tu:'mg',bv:Q,bu:'mL'}],
+    target:'mg', round:'whole',
+    hint:`tsp → mL → mg. 1 tsp = 5 mL, then apply the strength to get mg.`};
+}
+
+// 4 · Parenteral / IV → a RATE in, a RATE out (units/hr or mg/hr → mL/hr)
+function genIVHard(){
+  const pick=Math.random();
+  if(pick<0.4){
+    // heparin: units/hr ordered, units-in-a-bag on hand → mL/hr
+    const rate=rand([500,800,1000,1200,1500]);
+    const [bagU,bagML]=rand([[25000,500],[25000,250],[20000,500],[10000,250]]);
+    return {prompt:`Order: heparin infusion at <span class="ord">${rate.toLocaleString()} units/hr</span>. Available: <b>${bagU.toLocaleString()} units in ${bagML} mL</b> NS. Set the pump to how many mL/hr? (Round to the nearest whole number.)`,
+      chain:[{tv:rate,tu:'units',bv:1,bu:'hr'},{tv:bagML,tu:'mL',bv:bagU,bu:'units'}],
+      target:'mL/hr', round:'whole',
+      hint:`You're handed a dose <i>rate</i> (units/hr) and a bag concentration. units cancel → mL/hr falls out.`};
+  }
+  if(pick<0.7){
+    // drug mg/hr ordered, mg-in-a-bag on hand → mL/hr
+    const [name,bagMg,bagML]=rand([['aminophylline',500,250],['dopamine',400,250],['lidocaine',2000,500],['procainamide',2000,500]]);
+    const rate=rand([20,30,40,50,60]);
+    return {prompt:`Order: ${name} at <span class="ord">${rate} mg/hr</span>. Available: <b>${bagMg.toLocaleString()} mg in ${bagML} mL</b>. Set the pump to how many mL/hr? (Round to the nearest tenth.)`,
+      chain:[{tv:rate,tu:'mg',bv:1,bu:'hr'},{tv:bagML,tu:'mL',bv:bagMg,bu:'mg'}],
+      target:'mL/hr', round:'tenth',
+      hint:`mg/hr ÷ (mg per mL) = mL/hr. The mg cancel; you're left with mL over hr.`};
+  }
+  // liters over hours → mL/hr  (L → mL bridge)
+  const L=rand([1,1.5,2]); const hr=rand([8,10,12,24]);
+  return {prompt:`Infuse <span class="ord">${L} L</span> of lactated Ringer's over <b>${hr} hr</b>. Set the pump to how many mL/hr? (Round to the nearest whole number.)`,
+    chain:[{tv:L,tu:'L',bv:hr,bu:'hr'},{tv:1000,tu:'mL',bv:1,bu:'L'}],
+    target:'mL/hr', round:'whole',
+    hint:`The volume is in liters — convert to mL (1 L = 1,000 mL) before dividing by the hours.`};
+}
+
+// 5 · Powdered / reconstituted → the concentration is built, not handed to you
+function genPowderHard(){
+  const pick=Math.random();
+  if(pick<0.45){
+    // label states final concentration; order is in g → g → mg → mL
+    const [name,conc]=rand([['cefazolin',225],['ampicillin',250],['ceftriaxone',350],['nafcillin',250]]);
+    const g=rand([0.25,0.5,0.75,1]);
+    return {prompt:`The vial of <span class="ord">${name}</span> reads: reconstitute, final concentration <b>${conc} mg/mL</b>. Order: ${name} <b>${g} g</b> IM. How many mL? (Round to the nearest tenth.)`,
+      chain:[{tv:g,tu:'g',bv:1,bu:''},{tv:1000,tu:'mg',bv:1,bu:'g'},{tv:1,tu:'mL',bv:conc,bu:'mg'}],
+      target:'mL', round:'tenth',
+      hint:`Use the <i>reconstituted</i> concentration (${conc} mg/mL). But first convert the ${g} g order to mg.`};
+  }
+  if(pick<0.8){
+    // YOU compute the concentration: total powder ÷ final volume
+    const G=rand([1,2]); const V=rand([2.5,4,5,8,10]);
+    const D=rand([250,300,400,500,600,750]);
+    return {prompt:`A <span class="ord">${G} g</span> vial is reconstituted to a <b>final volume of ${V} mL</b>. Order: <b>${D} mg</b> IM. How many mL? (Round to the nearest tenth.)`,
+      chain:[{tv:D,tu:'mg',bv:1,bu:''},{tv:1,tu:'g',bv:1000,bu:'mg'},{tv:V,tu:'mL',bv:G,bu:'g'}],
+      target:'mL', round:'tenth',
+      hint:`No concentration is printed — build it: all ${G} g of powder now lives in ${V} mL. That's your strength.`};
+  }
+  // units powder (penicillin): order in units, label yields units/mL
+  const [conc] = rand([[250000],[500000],[100000]]);
+  const U=rand([300000,500000,600000,750000]);
+  return {prompt:`A penicillin G vial is reconstituted to <b>${conc.toLocaleString()} units/mL</b>. Order: <span class="ord">${U.toLocaleString()} units</span> IM. How many mL? (Round to the nearest tenth.)`,
+    chain:[{tv:U,tu:'units',bv:1,bu:''},{tv:1,tu:'mL',bv:conc,bu:'units'}],
+    target:'mL', round:'tenth',
+    hint:`Reconstituted strength is units/mL — divide the ordered units by it.`};
+}
+
+// 6 · Compound denominators — critical-care drips: a per-kg-per-time dose → mL/hr.
+// These need TWO units on the bottom of one fraction (mcg/kg/min), which is why
+// the engine grew tus/bus. The weight kills the kg, the 60 min/hr kills the min.
+function genDripHard(){
+  if(Math.random()<0.6){
+    // mcg/kg/min → mL/hr  (dopamine, dobutamine, nitroprusside…)
+    const wt=rand([50,60,70,75,80,90]);
+    const dose=rand([2,3,5,8,10]);
+    const [name,bagMg,bagML]=rand([['dopamine',400,250],['dobutamine',500,250],['dopamine',800,500],['nitroprusside',50,250]]);
+    return {prompt:`Order: <span class="ord">${name} ${dose} mcg/kg/min</span>. The client weighs <b>${wt} kg</b>. Available: <b>${bagMg} mg in ${bagML} mL</b> D5W. Set the pump to how many mL/hr? (Round to the nearest tenth.)`,
+      chain:[
+        {tv:dose,tu:'mcg',bv:1,bus:['kg','min']},
+        {tv:wt,tu:'kg',bv:1,bu:''},
+        {tv:60,tu:'min',bv:1,bu:'hr'},
+        {tv:1,tu:'mg',bv:1000,bu:'mcg'},
+        {tv:bagML,tu:'mL',bv:bagMg,bu:'mg'}
+      ],
+      target:'mL/hr', round:'tenth',
+      hint:`Five jumps. The dose is per kg <i>and</i> per min — you need the <b>weight</b> to cancel kg, and <b>60 min/hr</b> to cancel min. Then mcg → mg → mL.`};
+  }
+  // units/kg/hr → mL/hr  (weight-based heparin drip — compound, but no time bridge)
+  const wt=rand([60,70,80,90,100]);
+  const dose=rand([12,14,16,18]);
+  const [bagU,bagML]=rand([[25000,500],[25000,250],[20000,500]]);
+  return {prompt:`Order: <span class="ord">heparin ${dose} units/kg/hr</span>. The client weighs <b>${wt} kg</b>. Available: <b>${bagU.toLocaleString()} units in ${bagML} mL</b> NS. Set the pump to how many mL/hr? (Round to the nearest tenth.)`,
+    chain:[
+      {tv:dose,tu:'units',bv:1,bus:['kg','hr']},
+      {tv:wt,tu:'kg',bv:1,bu:''},
+      {tv:bagML,tu:'mL',bv:bagU,bu:'units'}
+    ],
+    target:'mL/hr', round:'tenth',
+    hint:`The dose is per kg per hr. Use the <b>weight</b> to cancel kg; the hr is already what the pump wants, so no time conversion here.`};
+}
+
+const HARD_POOL=[genWeightHard, genInjectHard, genOralHard, genIVHard, genPowderHard, genDripHard];
+function hardProblem(){ return rand(HARD_POOL)(); }
+
+/* ============================================================
    STATE / PROGRESS
 ============================================================ */
 const KEY='dosagecalc.progress.v1';
@@ -760,6 +1139,13 @@ let current='welcome', activeTab='learn';
 function renderNav(){
   const nav=$('#nav'); nav.innerHTML='';
   modules.forEach(m=>{
+    if(m.divider){
+      const d=document.createElement('div');
+      d.className='navlabel';
+      d.textContent=m.name;
+      nav.appendChild(d);
+      return;
+    }
     const s=modState(m.id);
     const b=document.createElement('button');
     b.className=(m.id===current?'active':'');
@@ -767,8 +1153,9 @@ function renderNav(){
     b.onclick=()=>go(m.id);
     nav.appendChild(b);
   });
-  const total=modules.length;
-  const done=modules.filter(m=>modState(m.id).done).length;
+  const realmods=modules.filter(m=>!m.divider);
+  const total=realmods.length;
+  const done=realmods.filter(m=>modState(m.id).done).length;
   $('#progbar').style.width=(done/total*100)+'%';
   $('#progtext').textContent=`${done} of ${total} modules done`;
 }
@@ -984,7 +1371,8 @@ function testStart(m){
     n=+b.dataset.n; $('#lenseg').querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   });
   $('#tstart').onclick=()=>{
-    const qs=[]; for(let k=0;k<n;k++) qs.push(testProblem());
+    const pick = m.hardPool ? hardProblem : testProblem;
+    const qs=[]; for(let k=0;k<n;k++) qs.push(pick());
     test={qs, i:0, answers:[]};
     testQuestion(m);
   };
